@@ -6,7 +6,7 @@
 web
 
 ## Stack
-HTML, CSS, and JavaScript with a small Canvas sprite renderer. The user's brief specifies an HTML/CSS prototype; the renderer is an implementation choice.
+Vite and React organize the interface into components, with CSS and a small Canvas sprite renderer. The prototype keeps project data locally in the browser.
 
 ## Users
 Developers and team leads exploring current work together.
@@ -15,6 +15,8 @@ Developers and team leads exploring current work together.
 Make a project visible as an excavation. Show known work, uncertain scope, order of operations, and where developers are working without implying deadlines or duration.
 
 ## Capabilities and Constraints
+The excavation occupies the full available workspace. A small collapsible worker palette floats at the top left. Clicking a block opens compact nonmodal details beside it; progress, uncertainty, and assignments are immediate, with size and dependencies in an expandable section. Close by Escape, the close button, or clicking outside. The same popup stays within the mobile screen; there are no permanent inspector or crew sidebars.
+
 Drag work blocks through soil. Move diggers onto blocks, including several diggers on one block and up to two work sites per person. Represent unknown scope with an adjustable vertical dithered gap in the block color: higher uncertainty hides a greater portion, and the color returns at the bottom rim. Preserve readable task labels. Represent deliberate progress with cracks and excavation. Depth indicates sequence, never time.
 
 Blocks form a contact stack of actual 2D rectangles. Dragging reorders work and snaps to contact edges. Collision and selection bounds match the colored box, with no external uncertainty padding. Uncertainty affects only the visible face. Extraction leaves a persistent empty space; completed bodies stay reserved during later rearrangement and neighboring cavities form one hole. The excavation grows deeper as work is added. It also expands sideways without a fixed column limit, with edge scrolling while dragging sideways or deeper. Known block width and height can be resized from all four edges and corners, independently of uncertainty, with masonry reflow and saved custom dimensions.

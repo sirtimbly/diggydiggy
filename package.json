@@ -5,7 +5,17 @@
   "type": "module",
   "description": "A pixel-art project excavation prototype",
   "scripts": {
-    "dev": "python3 -m http.server 4173 --bind 127.0.0.1",
-    "check": "node --check app.js && node --test *.test.js"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "node --test *.test.js && vite build"
+  },
+  "dependencies": {
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.1.2",
+    "vite": "^8.3.5"
   }
 }

@@ -42,3 +42,101 @@
 .block-digger[hidden]{display:none}
 
 .dependency-lines{z-index:3}.block-progress{right:43px}
+
+/* Canvas first: tools float above the world instead of reserving side columns. */
+html,body{height:100%;overflow:hidden}
+.app-header{height:52px;padding:0 20px;gap:18px}
+.brand{font-size:26px}.brand-pick{width:28px;height:28px}
+main{padding:0 12px 12px;max-width:none;height:calc(100dvh - 52px);display:flex;flex-direction:column}
+.project-heading{height:64px;flex:0 0 auto;margin:0;gap:12px;padding:0 6px;align-items:center}
+.project-title-line{flex-direction:row;align-items:center;gap:12px}
+.project-heading h1{font-size:19px;line-height:1.2;max-width:none;letter-spacing:-.4px}
+.project-heading p{display:none}.project-heading .demo-label{font-size:9px;padding:3px 5px}
+.project-heading>.button{min-height:34px;font-size:12px;padding:7px 11px}
+.workbench{display:block;flex:1;min-height:0;position:relative;overflow:hidden}
+.dig-panel{height:100%;min-height:0;align-self:auto}
+.dig-toolbar{height:44px;padding:0 12px;flex:0 0 auto;position:relative;z-index:24}
+.dig-toolbar .excavation-tools{gap:14px}.dig-toolbar h2{font-size:12px}.project-presence{font-size:11px}
+.canvas-stage{position:relative;flex:1;min-height:0;overflow:hidden}
+.pit-viewport{width:100%;height:100%;min-height:0;flex:none}
+.dig-legend{flex:0 0 auto;min-height:30px;padding:6px 12px;font-size:10px;gap:16px;flex-wrap:nowrap;z-index:2}
+.dig-legend .canvas-pan-hint{width:auto;margin-left:auto}
+.dig-legend .depth-explainer,.dig-legend .mobile-pan-hint{display:none!important}
+.crew-panel{position:absolute;left:12px;top:12px;z-index:25;display:block;width:236px;padding:8px;border:1px solid #c9cfbc;border-radius:7px;background:var(--panel);box-shadow:0 3px 14px #101b1733}
+.crew-tray-header{display:flex;align-items:center;justify-content:space-between;height:22px;padding-left:5px;margin-bottom:4px}
+.crew-tray-header h2{font-size:11px;line-height:1}.crew-tray-header .icon-button{width:26px;height:26px;min-width:26px;min-height:26px}.crew-tray-header svg{width:12px;height:12px}
+.crew-panel #crew-list{display:flex;gap:4px;flex-wrap:nowrap}
+.crew-panel #crew-list[hidden]{display:none}
+.crew-panel .crew-person{flex:1;min-width:0;margin:0}
+.crew-panel .crew-button{position:relative;flex-direction:column;gap:0;min-height:62px;padding:3px 1px;width:100%;align-items:center;text-align:center}
+.crew-panel .crew-sprite{width:24px;height:30px}
+.crew-panel .crew-copy{min-width:0}.crew-panel .crew-name{font-size:10px;line-height:16px}
+.crew-panel .crew-focus,.crew-panel .crew-color{display:none}
+.crew-sites{font-size:9px;line-height:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.crew-panel.is-collapsed{width:104px}.crew-panel.is-collapsed .crew-tray-header{margin:0}
+.cleared-menu{position:relative;font-size:11px;color:var(--muted)}
+.cleared-menu summary{cursor:pointer;display:flex;align-items:center;gap:6px;min-height:30px;padding:4px 8px;border-radius:4px;list-style:none}
+.cleared-menu summary::-webkit-details-marker{display:none}.cleared-menu summary:hover{background:#e9eddf}.cleared-menu summary::after{content:'';width:5px;height:5px;border-right:1px solid currentColor;border-bottom:1px solid currentColor;transform:rotate(45deg);margin-left:3px;margin-top:-3px}.cleared-menu[open] summary::after{transform:rotate(225deg);margin-top:3px}
+#cleared-count{font-variant-numeric:tabular-nums;background:#e8ecdc;border-radius:3px;min-width:17px;text-align:center}
+.cleared-menu #cleared-list{position:absolute;left:0;top:calc(100% + 6px);padding:12px;width:240px;max-height:240px;overflow:auto;background:var(--panel);border:1px solid #c9cfbc;border-radius:6px;box-shadow:0 5px 18px #101b1733}
+.cleared-menu .cleared-entry{display:flex;width:100%;margin:0;padding:8px 2px;font-size:12px;text-align:left}.cleared-menu .cleared-empty{margin:0;font-size:12px}
+.inspector-popup{display:none;position:fixed;inset:auto;margin:0;padding:0;width:min(344px,calc(100vw - 24px));max-height:min(660px,calc(100dvh - 24px));border:1px solid #bac5aa;border-radius:9px;background:var(--panel);color:var(--ink);box-shadow:0 12px 36px #111b1740;overflow:hidden;outline:none}
+.inspector-popup:popover-open{display:flex;flex-direction:column}
+.inspector-popup::backdrop{background:transparent;pointer-events:none}
+.popup-chrome{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:6px 10px 6px 16px;min-height:39px;border-bottom:1px solid var(--line);flex:0 0 auto}
+.popup-chrome>span{font-size:11px;font-weight:600;color:var(--muted)}
+.popup-chrome .icon-button{width:28px;height:28px;min-width:28px;min-height:28px}.popup-chrome svg{width:14px;height:14px}
+#inspector{padding:14px 16px 16px;border:0;display:block;min-height:0;overflow-y:auto;overscroll-behavior:contain;flex:1;scrollbar-width:thin;scrollbar-color:#a5b18d transparent}
+#inspector .inspector-header{margin:0 0 6px;min-height:24px}
+#inspector .inspector-header>span{font-size:10px}
+#inspector h2{font-size:20px;line-height:1.25;letter-spacing:-.35px}
+#inspector .task-note{font-size:12px;line-height:1.5;margin:7px 0 13px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+#inspector .inspector-section{padding:11px 0}
+#inspector .inspector-section:first-of-type{padding-top:0}
+#inspector .section-caption,#inspector .inspector-bottom{display:none}
+#inspector .field-label{font-size:11px;margin-bottom:7px}
+#inspector .progress-label{font-size:11px;margin:7px 0}
+#inspector .button{min-height:32px;font-size:12px}
+#inspector .assign-select{min-height:34px;padding:6px 8px;margin-top:7px}
+#inspector .assigned-person{display:inline-flex;gap:4px;margin:0 7px 0 0;font-size:11px}
+#inspector .assigned-person .crew-sprite{width:17px;height:22px}
+#inspector .icon-button{width:26px;height:26px;min-width:26px;min-height:26px}
+#inspector .dependency-row{font-size:11px;margin:3px 0}
+#inspector .dependency-add-label{margin-top:8px}
+#inspector .size-option{min-height:30px;padding:5px 8px;font-size:11px}
+#inspector .range-ends{font-size:10px}
+#inspector .assignment-empty{margin:0;font-size:11px}
+#inspector .form-group{margin:14px 0}
+@media(max-width:680px){
+ .app-header{height:44px;padding:0 12px;gap:12px}.brand{font-size:23px}.brand-pick{width:24px;height:24px}.workspace-name{font-size:10px}
+ main{height:calc(100dvh - 44px);padding:0 6px 6px}
+ .project-heading{height:52px;padding:0 3px}.project-heading h1{font-size:14px;letter-spacing:-.2px;max-width:190px}.project-heading .demo-label{display:none}.project-heading>.button{font-size:11px;padding:5px 8px;min-height:32px;white-space:nowrap}
+ .dig-toolbar{height:40px;padding:0 8px}.dig-toolbar .excavation-tools{gap:5px}.dig-toolbar h2,.project-presence{display:none}.cleared-menu summary{padding-left:1px}
+ .crew-panel{left:8px;top:8px;width:224px}.crew-panel .crew-button{min-height:60px}.crew-tray-header .icon-button{width:28px;height:28px}
+ .dig-legend{min-height:28px;padding:5px 8px;gap:14px;font-size:10px}.dig-legend .canvas-pan-hint{display:none}
+ #inspector{padding:12px 14px 14px}.popup-chrome .icon-button{min-width:32px;min-height:32px}.popup-chrome{min-height:42px}
+}
+
+.crew-panel{top:10px;padding:6px}
+.crew-tray-header{height:20px;margin-bottom:2px}
+.crew-panel .crew-button{min-height:56px;padding:2px 1px}
+.crew-panel .crew-sprite{width:22px;height:28px}
+.crew-panel .crew-copy,.crew-panel .crew-name{line-height:12px}
+.crew-sites{line-height:10px}
+
+.inspector-more{border-top:1px solid var(--line);margin-top:0}
+.inspector-more>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:38px;font-size:11px;font-weight:600;cursor:pointer;list-style:none}
+.inspector-more>summary::-webkit-details-marker{display:none}
+.inspector-more>summary svg{width:13px;height:13px;color:var(--muted);display:block}
+.inspector-more[open]>summary svg{transform:rotate(45deg)}
+#inspector .inspector-more .inspector-section{padding:10px 0}
+
+/* Connections recede as a complete stroke, including shadow and arrowhead. */
+.dependency-connection{opacity:.6}
+.dependency-connection.is-emphasized{opacity:1}
+/* Waiting/unassigned stone is quieter; ambient breaks still count as active work. */
+.task-block{--work-saturation:1;filter:saturate(var(--work-saturation))}
+.task-block.is-idle{--work-saturation:.8}
+.task-block:hover{filter:saturate(var(--work-saturation)) brightness(1.06)}
+.task-block.is-dragging{filter:saturate(var(--work-saturation)) brightness(1.1)}
+.task-block.is-drop-target{filter:saturate(var(--work-saturation)) brightness(1.15)}

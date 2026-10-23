@@ -89,7 +89,7 @@
       },
       {
         "name": "pickaxe",
-        "value": "4 frames; independent 155–235ms cadence",
+        "value": "4 frames; independent 155\u2013235ms cadence",
         "purpose": "Activity only; independent ambient breaks and bounded walking. Stationary under reduced motion; clocks pause offscreen."
       },
       {
@@ -107,7 +107,7 @@
       {
         "name": "wide",
         "value": "1550px",
-        "purpose": "Minimum width: larger sidebar columns and viewport."
+        "purpose": "Full-width canvas; floating crew and popup details rather than side columns."
       },
       {
         "name": "compact-desktop",
@@ -117,12 +117,12 @@
       {
         "name": "tablet",
         "value": "1000px",
-        "purpose": "Maximum width: crew above scene and inspector."
+        "purpose": "Full-width canvas; floating crew and popup details rather than side columns."
       },
       {
         "name": "mobile",
         "value": "680px",
-        "purpose": "Maximum width: inspector below pannable scene."
+        "purpose": "Compact headers, collapsed crew, full canvas, and viewport-clamped details popup."
       }
     ],
     "masonry": {
@@ -172,6 +172,13 @@
       "breaks": "Coffee and phone pauses last 2.8\u20135.4 seconds between longer digging stretches.",
       "walking": "Short walks in personal lanes within an exposed ledge; 8px worker spacing. No crossing buried ground. Frozen during block, resize, and person drags.",
       "progress": "Ambient only; no task or save mutations. Reduced motion is stationary."
+    },
+    "workspace": {
+      "layout": "One canvas filling available width and height; no permanent sidebars. 52px header, 64px project row, 44px toolbar, compact 30px legend; 12px gutters.",
+      "crew": "236px floating top-left tray with sprite, name, and site count; collapses to 104px. Mobile starts collapsed. Existing drag and click assignment interactions remain.",
+      "inspector": "Native nonmodal popover on block/cavity click, 344px wide with max 660px height and 12px viewport clamp. Progress/unknown/assignments first; Size & prerequisites expandable. Compact notes and assignment chips.",
+      "dismissal": "Escape, Close, outside click, or canvas wheel/pan. Keyboard activation supported and focus returns to the source on explicit close. Save/create returns to canvas.",
+      "completed": "Cleared menu in the toolbar and existing cavity markers. Reset is in Help."
     }
   },
   "components": [

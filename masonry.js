@@ -79,9 +79,9 @@ export function layoutMasonry(blocks, excavations = []) {
 }
 // Vertical rays from the surface determine the exposed parts of each top face.
 // Cavities are empty; every live rectangle above a face is an actual obstruction.
-export function surfaceAccess(placements){
+export function surfaceAccess(placements,surfaces=placements){
   const access=new Map();
-  for(const [id,{slot:body}] of placements){
+  for(const [id,{slot:body}] of surfaces){
     let ranges=[{x:body.x,width:body.width}];const blockedBy=[];
     for(const [otherId,{slot:roof}] of placements){
       if(id===otherId||roof.y+roof.height>body.y||roof.x>=body.x+body.width||roof.x+roof.width<=body.x)continue;
@@ -97,9 +97,13 @@ export function surfaceAccess(placements){
   return access;
 }
 export function excavationRects(placements,excavations=[]){
-  const access=surfaceAccess(placements),shafts=[];
+  // Removed bodies remain shaft targets even when there is no live work below.
+  // Only live stone occludes access; cavities never act as roofs for each other.
+  const surfaces=new Map(placements);
+  for(const hole of excavations)surfaces.set(Symbol('excavation'),{slot:hole,y:hole.y});
+  const access=surfaceAccess(placements,surfaces),shafts=[];
   for(const [id,face] of access)for(const range of face.ranges){
-    const y=placements.get(id).y;
+    const y=surfaces.get(id).y;
     if(y>MASONRY.surface)shafts.push({...range,y:MASONRY.surface,height:y-MASONRY.surface});
   }
   return [...excavations,...shafts];

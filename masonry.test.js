@@ -195,3 +195,18 @@ test('surface access stays collision-free across mixed sizes, dependencies, and 
   for(const shaft of excavationRects(preview.placements))for(const {slot} of preview.placements.values())assert.equal(intersects(shaft,slot),false);
   assertDependencyDepth({...project,blocks:preview.blocks},preview);
 });
+
+test('isolated excavations keep a full shaft open without a live block below',()=>{
+  const holes=[{blockId:'removed',x:48,y:400,width:250,height:148}];
+  const rectangles=excavationRects(new Map(),holes);
+  assert.ok(rectangles.some(r=>r.x===48&&r.width===250&&r.y===MASONRY.surface&&r.y+r.height===400));
+  assert.deepEqual(holes,[{blockId:'removed',x:48,y:400,width:250,height:148}]);
+});
+
+test('excavated shafts respect live roofs and other cavities do not occlude them',()=>{
+  const placements=new Map([['roof',{x:48,y:144,slot:{x:48,y:144,width:176,height:132}}]]);
+  const holes=[{blockId:'upper',x:224,y:300,width:176,height:100},{blockId:'lower',x:48,y:500,width:352,height:148}];
+  const rectangles=excavationRects(placements,holes),shafts=rectangles.slice(holes.length);
+  assert.ok(shafts.some(r=>r.x===224&&r.width===176&&r.y+r.height===500));
+  for(const shaft of shafts)for(const {slot} of placements.values())assert.equal(intersects(shaft,slot),false);
+});

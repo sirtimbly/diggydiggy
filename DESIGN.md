@@ -115,7 +115,7 @@ This documents the implemented prototype and the user’s confirmed digging dire
 
 ## Colors
 
-Warm paper and green controls frame a dark earth scene with five distinct work colors. Token values above are extracted from `styles.css` and the `PALETTE` fills in `app.js`.
+Warm paper and green controls frame a dark earth scene with five distinct work colors. Token values above are extracted from `styles.css` and the `PALETTE` fills in `src/project/project.js`.
 
 ### Primary
 
@@ -138,13 +138,13 @@ Warm paper and green controls frame a dark earth scene with five distinct work c
 
 Local `DM` aliases DM Sans; local `Pixel` aliases Silkscreen. The two DM font files provide regular and semibold styling. Use DM for working text and Pixel for the logo, scene sign, depth labels, block identifiers, percentages, and inspector status labels.
 
-The desktop headline is 29px; it becomes 26px at 1250px and 23px at 680px. Inspector headings are 23px, becoming 24px on mobile. Work block names are 20px, becoming 22px on mobile, and clamp to two lines. Body defaults to 14px/1.5, with controls and supporting text generally 11–13px. Mobile text fields become 16px. Scene text scales with terrain zoom while surrounding controls keep their size.
+The workspace headline is 19px, becoming 14px on mobile. Popup inspector headings are 20px on all screen sizes. Work block names are 20px, becoming 22px on mobile, and clamp to two lines. Body defaults to 14px/1.5, with controls and supporting text generally 11–13px. Mobile text fields become 16px. Scene text scales with terrain zoom while surrounding controls keep their size.
 
 ## Layout
 
-The header is 76px tall, with 40px horizontal gutters. Main content uses the same gutters and a maximum width of 1800px. The bordered workbench has crew / excavation / inspector columns of `205px minmax(360px,1fr) 268px`; panels commonly use 18–22px inset spacing. At 1550px the side columns grow to 225px and 290px. At 1250px gutters become 24px and the grid becomes `175px minmax(320px,1fr) 240px`.
+The header is 52px tall with 20px horizontal gutters. A 64px project row keeps the title and Add a block action compact. Main fills the remaining viewport with 12px side/bottom gutters; the workbench has one excavation column and no permanent side panels. A 44px toolbar and 30px legend frame the canvas, which takes all remaining width and height. Terrain expands to cover wide viewports, including when zooming out.
 
-At 1000px the crew moves across the top, above an excavation / inspector grid of `minmax(320px,1fr) 250px`. At 680px the workbench becomes one column: crew, excavation, then inspector. The header becomes 62px tall, main gutters become 12px, crew uses two columns, and the inspector gains a top divider. Completed work remains available above the scene when present.
+Below 680px, the header is 44px, the project row is 52px, the toolbar is 40px, and gutters are 6px. The crew tray starts collapsed. The page stays within the screen while the excavation and popup contents scroll independently.
 
 Middle-button drag or Space plus left-button drag pans the excavation, including when starting over a work item. Space shows a grab cursor; an active pan shows grabbing. Pointer capture keeps the gesture continuous outside the viewport; downward movement extends the ground. Release, Escape, lost capture, or window blur exits the gesture. A compact legend hint and help explain both shortcuts.
 
@@ -170,7 +170,7 @@ Inputs and selects use the field fill, 1px control border, 4px corners, and 8×9
 
 ### Header, tags, and containers
 
-The header pairs a pixel pickaxe and wordmark with workspace context, save status, and help. There is no multi-page navigation. The small outlined demo tag uses Pixel type. Crew and inspector sit on the panel surface with thin separators, while inspector sections use top rules and 20px vertical spacing.
+The header pairs a pixel pickaxe and wordmark with workspace context, save status, and help. There is no multi-page navigation. The small outlined demo tag uses Pixel type. The crew floats in a small paper tray; block details open in a paper popup with compact 11px section spacing.
 
 ### Dependency connectors
 
@@ -178,7 +178,7 @@ Each live block has input and output ports 7px inside its top-right and bottom-r
 
 ### Crew and excavation blocks
 
-Crew buttons combine a pixel sprite, name, and truncated assignment summary; selected diggers get a pale green background and border. Blocks are colored stone-like rectangles with a code, two-line title, status, reported percentage, cracks, and diggers placed above the top edge. Hover brightens blocks; selection uses a close-fitting 2px cream outline; drop targets use a 3px dashed cream outline offset 8px.
+Crew buttons combine a pixel sprite, name, and a compact work-site count; assignment summaries remain in accessible labels and tooltips; selected diggers get a pale green background and border. Blocks are colored stone-like rectangles with a code, two-line title, status, reported percentage, cracks, and diggers placed above the top edge. Hover brightens blocks; selection uses a close-fitting 2px cream outline; drop targets use a 3px dashed cream outline offset 8px.
 
 Multiple diggers may share a block; each person may have two work sites. Dragging a person or selecting them and choosing a block assigns work. Progress is reported in 10% steps; completing a block removes its material and leaves its exact footprint as a dark cavity, while listing the task as out of the ground. Adjacent cavity cells share one pixel rim, forming a single hole; surface cavities open through the grass. Rearranging and resizing work leaves excavated space intact. A cleared task can be selected from its cavity marker to reopen it. Dependencies show a waiting state. Independent pickaxe cycles vary from 155–235ms per frame. Each visible worker alternates 11–26 second digging stretches with occasional 2.8–5.4 second coffee or phone breaks, or short walks along the exposed ledge. Initial work stretches and frame offsets vary per worker. Reduced motion freezes the pose and suppresses completion particles and smooth scrolling.
 
@@ -209,10 +209,18 @@ Layout version 3 uses the colored rectangle itself as the collision body and sel
 
 Unoccluded top-face intervals open vertical shafts in cavity color `#1d2221`, clipped to exact body edges and merged with extracted cavities. Working sprites stand on these exposed spans; buried assignments are queued and their progress action explains the obstruction. Resize and drag previews use the same collision/exposure model. Dependency ports sit inside the top-right and bottom-right face corners, with progress moved left to stay clear.
 
-Cracks follow deterministic branching trees from several body edges. Jagged main fissures advance toward the interior; smaller forks begin only once the parent crack reaches their junction. Progress extends the connected tips and secondary branches, with steady 2px trunks and 1px forks instead of increasing thickness. The uncertainty mask also masks fractures. The excavation viewport has an explicit bounded height so the inspector cannot stretch away its vertical scroll range.
+Cracks follow deterministic branching trees from several body edges. Jagged main fissures advance toward the interior; smaller forks begin only once the parent crack reaches their junction. Progress extends the connected tips and secondary branches, with steady 2px trunks and 1px forks instead of increasing thickness. The uncertainty mask also masks fractures. The excavation fills the bounded workspace height; popup content cannot change its dimensions or vertical scroll range.
 
 ### Digger personality
 
 Character clocks are keyed by person and work site and survive inspector and board rerenders. Each worker has a different pickaxe phase, tempo, first break, and subsequent activity sequence. Coffee includes a cream mug raised for a sip and drifting steam; phone pauses show a small blue-green screen and tapping thumb. Walking has alternating legs, a subtle bob, and directional facing. These tiny gestures keep the existing 32×40 pixel sprite scale.
 
 Exposed ledges are divided into personal walking lanes with an 8px gap between workers. Walks stay within a single exposed interval and cover short distances; they cannot cross buried areas or another worker. Dragging/resizing temporarily freezes locomotion. Activity labels appear in the existing hover tooltip without noisy live announcements. Animation never modifies work state. Under reduced motion, all character poses and positions remain still. Offscreen and hidden-tab activity clocks pause and resume without replaying missed actions. Walking uses transforms on the small sprite button, avoiding layout changes.
+
+### Floating workspace tools
+
+The expanded Crew tray is about 236px wide and under 100px tall, pinned 12px from the left and 10px from the top of the canvas. Four sprite/name/site-count buttons support the existing assignment interactions. The plus/minus control collapses it to a 104px tray; mobile starts collapsed. Completed tasks move to a compact Cleared menu in the toolbar, with restoration also available through cavity markers. Reset remains in Help.
+
+Block details use a native nonmodal popover, 344px wide or the available screen width minus 24px, with a maximum height of 660px. It opens beside the clicked body or cavity, flips sides as needed, and clamps within 12px of the screen edges. It does not dim or resize the canvas. A fixed chrome row keeps Close available while the content scrolls. Progress, uncertainty, and assignments are immediately visible; Size & prerequisites expands the less frequent controls. Notes clamp to three lines, redundant captions are omitted, and assignment chips share a row.
+
+Escape, Close, and outside clicks dismiss the popup; Escape/Close restore focus to the originating block. Keyboard block activation opens the same popup. Native scrolling that brings a clicked block into view keeps the popup anchored; deliberate canvas wheel/pan gestures dismiss it. Creating and editing work use the same popup and saving returns to the canvas. Moving/resizing/assigning work does not open it.
