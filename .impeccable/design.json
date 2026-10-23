@@ -1,0 +1,271 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-22T20:32:35.320104+00:00",
+  "title": "Design System: Diggy",
+  "extensions": {
+    "colorMeta": {
+      "paper": {
+        "role": "neutral",
+        "displayName": "Cream paper"
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Light paper panel"
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Deep green ink"
+      },
+      "green": {
+        "role": "primary",
+        "displayName": "Workbench green"
+      },
+      "soil": {
+        "role": "neutral",
+        "displayName": "Excavation soil"
+      },
+      "amber": {
+        "role": "secondary",
+        "displayName": "Amber"
+      },
+      "moss": {
+        "role": "secondary",
+        "displayName": "Moss"
+      },
+      "lilac": {
+        "role": "secondary",
+        "displayName": "Lilac"
+      },
+      "coral": {
+        "role": "secondary",
+        "displayName": "Coral"
+      },
+      "blue": {
+        "role": "secondary",
+        "displayName": "Blue"
+      }
+    },
+    "typographyMeta": {
+      "brand": {
+        "displayName": "Pixel wordmark",
+        "purpose": "Local Silkscreen alias Pixel."
+      },
+      "headline": {
+        "displayName": "Project heading",
+        "purpose": "Local DM Sans alias DM; responsive 29/26/23px."
+      },
+      "label": {
+        "displayName": "Scene and status labels",
+        "purpose": "Pixel labels, not general body text."
+      }
+    },
+    "shadows": [
+      {
+        "name": "stone-face",
+        "value": "inset 0 4px 0 #ffffff30,inset 0 -5px 0 #00000020,inset 4px 0 0 #ffffff15,inset -4px 0 0 #00000017",
+        "purpose": "Hard inset block highlights and shade."
+      },
+      {
+        "name": "toast",
+        "value": "0 7px 22px #17211630",
+        "purpose": "Transient feedback."
+      },
+      {
+        "name": "dialog",
+        "value": "0 20px 80px #17211640",
+        "purpose": "Help dialog."
+      },
+      {
+        "name": "drag-ghost",
+        "value": "drop-shadow(0 4px 3px #0005)",
+        "purpose": "Lift the dragged digger preview."
+      }
+    ],
+    "motion": [
+      {
+        "name": "toast",
+        "value": "opacity .18s, transform .18s",
+        "purpose": "Toast entry and exit."
+      },
+      {
+        "name": "pickaxe",
+        "value": "4 frames; independent 155–235ms cadence",
+        "purpose": "Activity only; independent ambient breaks and bounded walking. Stationary under reduced motion; clocks pause offscreen."
+      },
+      {
+        "name": "completion",
+        "value": "1s",
+        "purpose": "Canvas pixel particles; omitted for reduced motion."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Disable CSS transitions and smooth scrolling; freeze sprite poses and omit particles."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1550px",
+        "purpose": "Minimum width: larger sidebar columns and viewport."
+      },
+      {
+        "name": "compact-desktop",
+        "value": "1250px",
+        "purpose": "Maximum width: reduced gutters and columns."
+      },
+      {
+        "name": "tablet",
+        "value": "1000px",
+        "purpose": "Maximum width: crew above scene and inspector."
+      },
+      {
+        "name": "mobile",
+        "value": "680px",
+        "purpose": "Maximum width: inspector below pannable scene."
+      }
+    ],
+    "masonry": {
+      "columns": "12 initial; signed horizontal movement remains unbounded",
+      "columnWidth": "64px keyboard stride; 8px drag grid plus contact-edge snaps",
+      "verticalUnit": "Exact body edges; no extra margin",
+      "diggerHeadroom": "48px open surface shaft; deeper shafts follow exposure, never padded body reservations",
+      "joint": "0px",
+      "placement": "Solid colored rectangles pack without overlap against body contact edges or dependency depth floors. Uncertainty adds no collision padding.",
+      "excavation": "Completed colored bodies reserve their exact bounds; exposed top-face intervals open shafts to the surface. Shafts and cavities paint as one clipped dark union.",
+      "growth": "Bounded viewport scrolls independently. Wheel, middle drag, Space drag, and bottom-edge dragging open deeper ground. Both horizontal directions remain unbounded. Terrain is painted only near the viewport.",
+      "resize": {
+        "handles": [
+          "n",
+          "s",
+          "e",
+          "w",
+          "nw",
+          "ne",
+          "sw",
+          "se"
+        ],
+        "step": "8px",
+        "keyboardShiftStep": "32px",
+        "knownWidth": "176\u2013640px",
+        "knownHeight": "132\u2013640px",
+        "behavior": "Resize known scope independently of uncertainty. Repack around fixed excavations. Custom dimensions persist; presets reset them. Escape discards the preview."
+      },
+      "dependencies": {
+        "ports": "26px green circular input/output, 7px inside the top-right and bottom-right face corners, separate from resize grips",
+        "lines": "Orthogonal cream/green lines with dark under-strokes and compact 9px user-space arrowheads sharing the same stroke and colors. Selected and invalid states match their respective arrowheads.",
+        "interaction": "Drag from a prerequisite output onto dependent work; keyboard/click source then target also works. Multiple prerequisites; no self, duplicate, or cyclic links.",
+        "ordering": "Stable topological packing keeps every dependent below its prerequisites. Overhead body projections additionally determine which top-face intervals are accessible to diggers."
+      },
+      "uncertaintyVisual": "4px ordered Bayer alpha mask on the colored face, texture, and cracks. Higher uncertainty removes a greater vertical middle region. The final bottom pixels return to solid color. 0% is solid. Readable labels and controls remain unmasked; outer speckles and collision padding are removed.",
+      "layoutVersion": 3,
+      "fractures": "Deterministic edge-rooted lightning trees. Progress extends connected jagged trunks inward and reveals smaller forks and secondary branches; 2px/1px weights remain fixed. Shared uncertainty mask."
+    },
+    "diggerAnimation": {
+      "clock": "Independent seeded clock per person/site, preserved across rerenders; phase and 155\u2013235ms pickaxe tempo vary.",
+      "activities": [
+        "dig",
+        "coffee",
+        "phone",
+        "walk"
+      ],
+      "breaks": "Coffee and phone pauses last 2.8\u20135.4 seconds between longer digging stretches.",
+      "walking": "Short walks in personal lanes within an exposed ledge; 8px worker spacing. No crossing buried ground. Frozen during block, resize, and person drags.",
+      "progress": "Ambient only; no task or save mutations. Reduced motion is stationary."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "description": "Green primary action.",
+      "html": "<button class=\"ds-primary\">Add a block</button>",
+      "css": ".ds-primary{font-family:var(--font,DM,sans-serif);display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:39px;padding:9px 15px;border:1px solid #cdd2c2;border-radius:5px;background:transparent;color:var(--ink,#303c30);font-size:13px;font-weight:600;cursor:pointer;background:var(--green,#355c38);border-color:var(--green,#355c38);color:#fffef4}.ds-primary:hover{background:#294b2d}.ds-primary:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}.ds-primary:disabled{opacity:.45;cursor:default}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Secondary button",
+      "kind": "button",
+      "description": "Outlined supporting action.",
+      "html": "<button class=\"ds-secondary\">Add a block</button>",
+      "css": ".ds-secondary{font-family:var(--font,DM,sans-serif);display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:39px;padding:9px 15px;border:1px solid #cdd2c2;border-radius:5px;background:transparent;color:var(--ink,#303c30);font-size:13px;font-weight:600;cursor:pointer;}.ds-secondary:hover{background:#e9eddc}.ds-secondary:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}.ds-secondary:disabled{opacity:.45;cursor:default}",
+      "refersTo": "button-secondary"
+    },
+    {
+      "name": "Icon button",
+      "kind": "button",
+      "description": "Compact transparent toolbar control.",
+      "html": "<button class=\"ds-icon\" aria-label=\"Zoom in\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 5v14M5 12h14\"/></svg></button>",
+      "css": ".ds-icon{display:inline-flex;align-items:center;justify-content:center;width:30px;height:32px;padding:5px;border:0;background:transparent;border-radius:5px;color:var(--ink,#303c30);cursor:pointer}.ds-icon svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round}.ds-icon:hover{background:#e9eadf}.ds-icon:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}"
+    },
+    {
+      "name": "Text action",
+      "kind": "button",
+      "description": "Small underlined reset or supporting action.",
+      "html": "<button class=\"ds-text\">Reset demo</button>",
+      "css": ".ds-text{font-family:var(--font,DM,sans-serif);font-size:11px;background:none;border:0;padding:0;text-decoration:underline;text-underline-offset:3px;color:var(--muted,#626b5b);cursor:pointer}.ds-text:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}"
+    },
+    {
+      "name": "Text field",
+      "kind": "input",
+      "description": "Light field from the block editor.",
+      "html": "<label class=\"ds-field-label\" for=\"ds-title\">What\u2019s the work?</label><input class=\"ds-field\" id=\"ds-title\" placeholder=\"Give this block a name\">",
+      "css": ".ds-field-label{font-family:var(--font,DM,sans-serif);display:block;font-size:11px;font-weight:600;margin-bottom:9px;color:var(--ink,#303c30)}.ds-field{font-family:var(--font,DM,sans-serif);width:100%;border:1px solid #d5d9c7;background:#fffef9;border-radius:4px;padding:8px 9px;font-size:12px;color:var(--ink,#303c30)}.ds-field:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}",
+      "refersTo": "field"
+    },
+    {
+      "name": "Demo tag",
+      "kind": "chip",
+      "description": "The passive project context label.",
+      "html": "<span class=\"ds-tag\">DEMO PROJECT</span>",
+      "css": ".ds-tag{display:inline-block;font:11px Pixel;color:#687258;border:1px solid #d9decb;padding:4px 7px;white-space:nowrap}"
+    },
+    {
+      "name": "Workbench container",
+      "kind": "card",
+      "description": "Bordered panel shell without an exterior shadow.",
+      "html": "<section class=\"ds-panel\"><h2>The crew</h2><p>Pick a digger. Find their next block.</p></section>",
+      "css": ".ds-panel{font-family:var(--font,DM,sans-serif);padding:22px 18px;border:1px solid #d6d9c8;border-radius:8px;background:var(--panel,#faf9f3);color:var(--ink,#303c30)}.ds-panel h2{margin:0;font-size:13px;font-weight:600}.ds-panel p{font-size:11px;line-height:1.6;color:var(--muted,#626b5b);margin:9px 0 23px}",
+      "refersTo": "workbench"
+    },
+    {
+      "name": "Workspace header",
+      "kind": "nav",
+      "description": "Wordmark and workspace context from the single-screen header.",
+      "html": "<header class=\"ds-header\"><a class=\"ds-brand\" href=\"#\">diggy<span>.</span></a><i></i><span class=\"ds-workspace\">The workshop</span></header>",
+      "css": ".ds-header{font-family:var(--font,DM,sans-serif);display:flex;align-items:center;gap:24px;padding:0 40px;height:76px;border-bottom:1px solid var(--line,#dfdfd1);background:var(--paper,#f5f3e9);color:var(--ink,#303c30)}.ds-brand{font:29px Pixel;letter-spacing:-1px;text-decoration:none;color:inherit}.ds-brand span{color:#7e9457}.ds-header i{height:24px;width:1px;background:var(--line,#dfdfd1)}.ds-workspace{font-size:13px;color:var(--muted,#626b5b)}.ds-brand:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}"
+    },
+    {
+      "name": "Work block",
+      "kind": "custom",
+      "description": "Known amber work with the implemented stone face and selection state.",
+      "html": "<button class=\"ds-block\"><span class=\"ds-code\">DIG-01</span><strong>Authentication</strong><span class=\"ds-status\">Digging together</span></button>",
+      "css": ".ds-block{font-family:var(--font,DM,sans-serif);display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:250px;height:148px;padding:15px 16px;background:#ddb472;color:#332b27;border:0;border-radius:1px;box-shadow:inset 0 4px 0 #ffffff30,inset 0 -5px 0 #00000020,inset 4px 0 0 #ffffff15,inset -4px 0 0 #00000017;outline:2px solid #fbf0bd;outline-offset:5px;cursor:grab}.ds-code{font:12px Pixel;opacity:.78;letter-spacing:.3px}.ds-block strong{font-size:20px;font-weight:600;line-height:1.25;margin-top:8px}.ds-status{font-size:12px;margin-top:auto;padding-top:8px}.ds-block:hover{filter:brightness(1.06)}.ds-block:focus-visible{outline:3px solid #fff5c4;outline-offset:6px}",
+      "refersTo": "task-block"
+    }
+  ],
+  "narrative": {
+    "northStar": "A project excavation",
+    "overview": "A pixel-art excavation sits inside a quiet cream-paper workbench. Earth and stone textures, colored work blocks, and small diggers make the project tangible; restrained sans-serif controls keep the scene usable.\n\nThis documents the implemented prototype and the user\u2019s confirmed digging direction. Depth communicates sequence, soft pixel edges communicate uncertain scope, and cracks communicate manually reported progress. Pickaxe movement communicates activity only.",
+    "keyCharacteristics": [
+      "Cream-paper controls around a dark, textured excavation.",
+      "Pixel typography for scene labels; DM Sans for readable controls and task names.",
+      "Colored blocks with adjustable uncertainty and several visible diggers.",
+      "Manual progress, with no date or time axis."
+    ],
+    "rules": [],
+    "dos": [
+      "Do keep the excavation central and controls on light paper surfaces.",
+      "Do render terrain, cracks, dithering, and sprites with crisp pixel edges.",
+      "Do distinguish the known beginning and end from the dithered unknown middle.",
+      "Do preserve text and focus cues alongside color and animation.",
+      "Do keep progress deliberate and the mobile scene pannable."
+    ],
+    "donts": [
+      "Don\u2019t turn excavation depth or block dimensions into deadlines or duration.",
+      "Don\u2019t advance progress from pickaxe animation.",
+      "Don\u2019t replace readable interface text with pixel typography throughout.",
+      "Don\u2019t let decorative terrain compete with the colored work blocks."
+    ]
+  }
+}
