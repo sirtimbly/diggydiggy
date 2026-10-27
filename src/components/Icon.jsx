@@ -1,4 +1,7 @@
+import { useLayoutEffect, useRef } from "react";
+import { drawSprite } from "../rendering/pixels.js";
 import { icons } from "../rendering/icons.js";
+import { DIGGER } from "../../digger-geometry.js";
 
 export function Icon({ name }) {
   return (
@@ -10,13 +13,16 @@ export function Icon({ name }) {
   );
 }
 
-export function Sprite({ person, working = false }) {
+export function Sprite({ person, working = false, preview = false }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => { drawSprite(ref.current, person); }, [person.id, person.color, person.shirt, person.skin, person.hairLength, person.hairColor, person.glasses, person.headphones]);
   return (
     <canvas
+      ref={ref}
       className="crew-sprite"
-      width="32"
-      height="40"
-      data-person={person.id}
+      width={DIGGER.width}
+      height={DIGGER.height}
+      data-person={preview ? undefined : person.id}
       data-working={working}
       aria-hidden="true"
     />

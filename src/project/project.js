@@ -1,3 +1,6 @@
+import { DEFAULT_CREW, validCrew, placementLimit, validPlacementLimit } from "./crew.js";
+import { validColorLegend } from "./color-legend.js";
+import { validDividers } from "./dividers.js";
 import {
   MASONRY,
   SIZES,
@@ -6,46 +9,22 @@ import {
 } from "../../masonry.js";
 
 export const STORAGE = "diggy-project-v1";
-export const PALETTE = {
-  amber: { fill: "#ddb472", shade: "#a07f4b", name: "Amber" },
-  moss: { fill: "#a7bc83", shade: "#788e5c", name: "Moss" },
-  lilac: { fill: "#b4a6cf", shade: "#857598", name: "Lilac" },
-  coral: { fill: "#d9957d", shade: "#9e6959", name: "Coral" },
-  blue: { fill: "#8eb7c3", shade: "#5f8999", name: "Blue" },
-};
-export const PEOPLE = [
-  {
-    id: "maya",
-    name: "Maya",
-    color: "#deb969",
-    shirt: "#a76a50",
-    skin: "#d9a17b",
-  },
-  {
-    id: "theo",
-    name: "Theo",
-    color: "#a5b99a",
-    shirt: "#678e8a",
-    skin: "#b87e5b",
-  },
-  {
-    id: "jun",
-    name: "Jun",
-    color: "#bbb0d2",
-    shirt: "#8a77ac",
-    skin: "#e3bd91",
-  },
-  {
-    id: "sam",
-    name: "Sam",
-    color: "#d49d89",
-    shirt: "#b48166",
-    skin: "#9a684a",
-  },
-];
+export { PALETTE } from "./palette.js";
+import { PALETTE } from "./palette.js";
+// Kept as a seed export for older fixtures; runtime crew belongs to each project.
+export { DEFAULT_CREW as PEOPLE } from "./crew.js";
+export const PROJECT_NAME_LIMIT = 80;
+export const PROJECT_SUBTITLE_LIMIT = 80;
+export const projectName = (project) => project.name ?? "Untitled project";
+export const blockNumber = (block) => block.code.replace(/^DIG-/, "").replace(/^0+(?=\d)/, "");
+export function emptyProject() {
+  return { version: 1, name: "Untitled project", layoutVersion: 3, selected: null, blocks: [], crew: [], dividers: [], colorLegend: {}, excavations: [] };
+}
 export function demo() {
   return {
     version: 1,
+    name: "The next release",
+    crew: structuredClone(DEFAULT_CREW),
     selected: "b1",
     blocks: [
       {
@@ -179,6 +158,14 @@ export function validProject(p) {
     p.blocks.length > 100
   )
     return false;
+  if (p.maxPlacements !== undefined && !validPlacementLimit(p.maxPlacements)) return false;
+  if (p.name !== undefined && (typeof p.name !== "string" || !p.name.trim() || p.name.length > PROJECT_NAME_LIMIT)) return false;
+  if (p.subtitle !== undefined && (typeof p.subtitle !== "string" || p.subtitle.length > PROJECT_SUBTITLE_LIMIT)) return false;
+  if (p.crew === undefined) p.crew = structuredClone(DEFAULT_CREW);
+  if (!validCrew(p.crew)) return false;
+  if (p.dividers === undefined) p.dividers = [];
+  if (!validDividers(p.dividers)) return false;
+  if (p.colorLegend !== undefined && !validColorLegend(p.colorLegend)) return false;
   const ids = new Set();
   for (const b of p.blocks) {
     if (
@@ -199,11 +186,14 @@ export function validProject(p) {
       b.uncertainty < 0 ||
       b.uncertainty > 48 ||
       !Array.isArray(b.people) ||
-      !b.people.every((id) => PEOPLE.some((p) => p.id === id))
+      !b.people.every((id) => p.crew.some((person) => person.id === id && (b.done || !person.archived))) ||
+      new Set(b.people).size !== b.people.length
     )
       return false;
     if (typeof b.done !== "boolean" || typeof b.dependency !== "string")
       return false;
+    if ((b.blocked !== undefined && typeof b.blocked !== "boolean") ||
+      (b.blocked && (b.done || b.people.length))) return false;
     if (
       b.dependencies !== undefined &&
       (!Array.isArray(b.dependencies) ||
@@ -228,6 +218,7 @@ export function validProject(p) {
     if (!Number.isInteger(b.pinnedColumn)) delete b.pinnedColumn;
     if (b.pinnedX !== undefined && !Number.isFinite(b.pinnedX))
       delete b.pinnedX;
+    if (b.pinnedY !== undefined && (!Number.isFinite(b.pinnedY) || b.pinnedY < MASONRY.top || b.pinnedY > 1e7)) return false;
     if (
       b.width !== undefined &&
       (!Number.isFinite(b.width) ||
@@ -248,9 +239,9 @@ export function validProject(p) {
   } catch {
     return false;
   }
-  return PEOPLE.every(
+  return p.crew.every(
     (person) =>
       p.blocks.filter((b) => !b.done && b.people.includes(person.id)).length <=
-      2,
+      placementLimit(p),
   );
 }

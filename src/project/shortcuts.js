@@ -1,3 +1,10 @@
+export function canvasShortcut(event) {
+  if (event.defaultPrevented || event.isComposing || event.repeat || event.altKey || event.metaKey || event.ctrlKey ||
+    event.target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"],[inert]')) return null;
+  const key = event.key.toLowerCase();
+  return key === "n" ? "new" : key === "g" ? "go" : null;
+}
+
 export function historyShortcut(event) {
   if (
     event.defaultPrevented ||

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MASONRY, RESIZE_LIMITS, blockDimensions, footprint, excavationRects, applyMasonry, layoutMasonry, intersects, previewMove, previewResize, dependenciesOf, dependencyOrder, canAddDependency } from './masonry.js';
+import { MASONRY, RESIZE_LIMITS, blockDimensions, footprint, excavationRects, applyMasonry, layoutMasonry, intersects, previewMove, previewResize, previewGrowToEdge, dependenciesOf, dependencyOrder, canAddDependency } from './masonry.js';
 
 const block = (id, size = 'medium', uncertainty = 24) => ({ id, size, uncertainty, x: 48, y: 180, done: false });
 function assertStructure(layout, cavities = []) {
@@ -178,6 +178,10 @@ test('overlapping overhead projections leave exact exposed ledges and reject nar
   assert.deepEqual(result.access.get('lower').ranges,[{x:224,width:76},{x:476,width:72}]);
   const narrow=layoutMasonry([{...block('roof'),width:250,pinnedX:48},{...block('lower'),width:272,pinnedX:48}]);
   assert.equal(narrow.access.get('lower').reachable,false,'a 22px sliver cannot accommodate a digger');
+  for (const width of [32,39,40,48]) {
+    const ledge=layoutMasonry([{...block('roof'),width:250,pinnedX:48},{...block('lower'),width:250+width,pinnedX:48}]);
+    assert.equal(ledge.access.get('lower').reachable,width>=40,'access needs room for the enlarged animated silhouette');
+  }
 });
 
 test('migration shrinks old padded excavations to their actual colored bounds once',()=>{
@@ -209,4 +213,51 @@ test('excavated shafts respect live roofs and other cavities do not occlude them
   const rectangles=excavationRects(placements,holes),shafts=rectangles.slice(holes.length);
   assert.ok(shafts.some(r=>r.x===224&&r.width===176&&r.y+r.height===500));
   for(const shaft of shafts)for(const {slot} of placements.values())assert.equal(intersects(shaft,slot),false);
+});
+
+const alignedBlock = (id, x, width, dependencies = []) => ({...block(id), pinnedX:x, width, height:148, dependencies, dependency:dependencies[0]??''});
+function alignmentProject(blocks, excavations = []) {
+  const project = {version:1, layoutVersion:3, blocks, excavations};
+  applyMasonry(project);
+  return project;
+}
+test('quick edge growth uses the nearest outward seam above or below, with exact widths and a fixed opposite edge', () => {
+  const project=alignmentProject([alignedBlock('roof',48,500),alignedBlock('work',128,250,['roof']),alignedBlock('below',300,176,['work'])]);
+  const before=JSON.stringify(project), old={...project.blocks.find(b=>b.id==='work').slot};
+  const right=previewGrowToEdge(project,'work','e'),body=right.placements.get('work').slot;
+  assert.equal(right.ok,true);assert.equal(right.targetId,'below');assert.equal(body.x,old.x);assert.equal(body.x+body.width,476);assert.equal(body.width,348);assert.equal(body.height,old.height);assert.equal(body.y,old.y);
+  assertStructure(right);assertDependencyDepth({...project,blocks:right.blocks},right);
+  assert.equal(JSON.stringify(project),before,'preview leaves the original untouched');
+  const left=previewGrowToEdge(project,'work','w'),leftBody=left.placements.get('work').slot;
+  assert.equal(left.targetX,48);assert.equal(leftBody.x,48);assert.equal(leftBody.x+leftBody.width,old.x+old.width);assert.equal(leftBody.height,old.height);assertStructure(left);
+});
+test('quick alignment can meet either vertical edge of an overhead block and grows to successive seams', () => {
+  const project=alignmentProject([alignedBlock('top',48,250),alignedBlock('middle',100,300,['top']),alignedBlock('work',320,200,['middle'])]);
+  let preview=previewGrowToEdge(project,'work','w');
+  assert.equal(preview.targetId,'top');assert.equal(preview.targetX,298);assert.equal(preview.placements.get('work').slot.width,222);
+  project.blocks=preview.blocks;applyMasonry(project);
+  preview=previewGrowToEdge(project,'work','w');assert.equal(preview.targetX,100);assert.equal(preview.placements.get('work').slot.x+preview.placements.get('work').slot.width,520);
+  const other=alignmentProject([alignedBlock('leftRoof',48,200),alignedBlock('rightRoof',300,200),alignedBlock('work',48,200,['leftRoof'])]);
+  const right=previewGrowToEdge(other,'work','e');assert.equal(right.targetId,'rightRoof');assert.equal(right.targetX,300);assert.equal(right.placements.get('work').slot.width,252);assertStructure(right);
+});
+test('a lower block can supply the nearest left edge, and alignment supports negative world coordinates', () => {
+  const project=alignmentProject([alignedBlock('roof',48,500),alignedBlock('work',128,250,['roof']),alignedBlock('below',80,200,['work'])]);
+  const left=previewGrowToEdge(project,'work','w');assert.equal(left.targetId,'below');assert.equal(left.targetX,80);assert.equal(left.placements.get('work').slot.x,80);assertStructure(left);
+  const negative=alignmentProject([alignedBlock('roof',-300,640),alignedBlock('work',48,250,['roof'])]);
+  const preview=previewGrowToEdge(negative,'work','w');assert.equal(preview.ok,true);assert.equal(preview.targetX,-300);assert.equal(preview.placements.get('work').slot.width,598);assert.ok(preview.left<-300);assertStructure(preview);
+  const restored=structuredClone({...negative,blocks:preview.blocks});applyMasonry(restored);assert.equal(restored.blocks.find(b=>b.id==='work').x,-300);
+});
+test('edge alignment cannot grow across a neighbor or refill excavated ground', () => {
+  const withNeighbor=alignmentProject([alignedBlock('roof',48,500),alignedBlock('work',128,250,['roof']),alignedBlock('neighbor',378,176)]);
+  const before=JSON.stringify(withNeighbor),blocked=previewGrowToEdge(withNeighbor,'work','e');assert.equal(blocked.ok,false);assert.match(blocked.reason,/blocks that edge/);assert.equal(JSON.stringify(withNeighbor),before);
+  const hole={blockId:'cleared',x:378,y:292,width:176,height:148};
+  const withHole=alignmentProject([alignedBlock('roof',48,500),alignedBlock('work',128,250,['roof']),{...alignedBlock('cleared',378,176),done:true}],[hole]);
+  const holes=JSON.stringify(withHole.excavations),result=previewGrowToEdge(withHole,'work','e');assert.equal(result.ok,false);assert.match(result.reason,/excavated/);assert.equal(JSON.stringify(withHole.excavations),holes);
+});
+test('same-course blocks, inward edges, completed work, and unreachable widths leave the block unchanged', () => {
+  const sameCourse=alignmentProject([alignedBlock('work',48,200),alignedBlock('neighbor',300,200)]);assert.equal(previewGrowToEdge(sameCourse,'work','e').ok,false);
+  const aligned=alignmentProject([alignedBlock('roof',48,250),alignedBlock('work',48,250,['roof'])]);assert.equal(previewGrowToEdge(aligned,'work','w').ok,false);assert.equal(previewGrowToEdge(aligned,'work','e').ok,false);
+  assert.equal(previewGrowToEdge(aligned,'work','n').ok,false);assert.equal(previewGrowToEdge(aligned,'missing','w').ok,false);
+  const wide=alignmentProject([alignedBlock('roof',300,640),alignedBlock('work',48,300,['roof'])]);const original=JSON.stringify(wide);const limited=previewGrowToEdge(wide,'work','e');assert.equal(limited.ok,false);assert.match(limited.reason,/maximum/);assert.equal(JSON.stringify(wide),original);
+  aligned.blocks.find(b=>b.id==='work').done=true;assert.equal(previewGrowToEdge(aligned,'work','w').ok,false);
 });

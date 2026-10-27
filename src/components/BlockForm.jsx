@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { PALETTE } from "../project/project.js";
+import { BlockColorPicker } from "./BlockColorPicker.jsx";
 import { Icon } from "./Icon.jsx";
 
-export function BlockForm({ block, actions }) {
-  const [color, setColor] = useState(block?.color ?? "amber");
+export function BlockForm({ block, initialColor, actions, project }) {
+  const [color, setColor] = useState(block?.color ?? initialColor ?? "amber");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const titleInput = useRef(null);
   useEffect(() => {
@@ -36,6 +36,7 @@ export function BlockForm({ block, actions }) {
           <Icon name="close" />
         </button>
       </div>
+      <BlockColorPicker project={project} color={color} onChange={(next) => { setColor(next); actions.rememberBlockColor(next); }} />
       <h2>{block ? "A clearer picture." : "Plant a new block."}</h2>
       <p className="task-note">
         Start with what you know. Leave some room for what you don’t.
@@ -46,6 +47,7 @@ export function BlockForm({ block, actions }) {
         </label>
         <input
           ref={titleInput}
+          autoFocus
           className="field-input"
           id="block-title"
           name="title"
@@ -66,21 +68,6 @@ export function BlockForm({ block, actions }) {
           placeholder="What do we know so far?"
           defaultValue={block?.note ?? ""}
         />
-        <div className="field-label">A color in the ground</div>
-        <div className="color-options" role="group" aria-label="Block color">
-          {Object.entries(PALETTE).map(([key, value]) => (
-            <button
-              key={key}
-              type="button"
-              className={`color-option ${key === color ? "active" : ""}`}
-              data-color={key}
-              style={{ background: value.fill }}
-              aria-label={value.name}
-              aria-pressed={key === color}
-              onClick={() => setColor(key)}
-            />
-          ))}
-        </div>
         <input type="hidden" name="color" value={color} />
         <button className="button primary" type="submit">
           <Icon name={block ? "check" : "plus"} />

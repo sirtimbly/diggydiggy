@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 36" fill="none" shape-rendering="crispEdges">
+  <!-- Solid horizontal T-grip, centered on the shaft. -->
+  <path fill="#2d4b40" d="M11 0h10v1h1v3h-4v18h-4V4h-4V1h1V0Z"/>
+  <path fill="#d88958" d="M12 1h8v2h-8z"/>
+  <path fill="#efb17b" d="M13 1h6v1h-6z"/>
+  <!-- Timber shaft and brass socket. -->
+  <path fill="#b88149" d="M14 4h4v18h-4z"/>
+  <path fill="#e5ba77" d="M15 4h2v18h-2z"/>
+  <!-- A taller, narrower blade; unequal pixel steps curve toward the point. -->
+  <path fill="#2d4b40" d="M8 18h16v10h-1v2h-2v2h-2v2h-1v2h-4v-2h-1v-2h-2v-2H9v-2H8V18Z"/>
+  <path fill="#77a79b" d="M10 20h12v8h-1v1h-2v2h-2v2h-2v-2h-2v-2h-2v-1h-1v-8Z"/>
+  <path fill="#b3d1bc" d="M10 20h4v2h-2v6h-2v-8Z"/>
+  <path fill="#507e75" d="M20 23h2v5h-1v1h-2v2h-2v2h-1v-2h1v-2h1v-1h2v-5Z"/>
+  <path fill="#d5e3c6" d="M15 22h2v10h-2z"/>
+  <path fill="#2d4b40" d="M12 16h8v6h-8z"/>
+  <path fill="#e4b55d" d="M14 16h4v4h-4z"/>
+  <path fill="#f0cf83" d="M14 16h4v2h-4z"/>
+  <path fill="#d5e3c6" d="M11 20h2v2h-2zm8 0h2v2h-2z"/>
+</svg>

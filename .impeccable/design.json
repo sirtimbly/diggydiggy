@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-22T20:32:35.320104+00:00",
+  "generatedAt": "2026-10-24T21:38:59Z",
   "title": "Design System: Diggy",
   "extensions": {
     "colorMeta": {
@@ -43,6 +43,46 @@
       "blue": {
         "role": "secondary",
         "displayName": "Blue"
+      },
+      "rose": {
+        "role": "secondary",
+        "displayName": "Rose"
+      },
+      "rose-shade": {
+        "role": "secondary",
+        "displayName": "Rose shade"
+      },
+      "peach": {
+        "role": "secondary",
+        "displayName": "Peach"
+      },
+      "peach-shade": {
+        "role": "secondary",
+        "displayName": "Peach shade"
+      },
+      "lemon": {
+        "role": "secondary",
+        "displayName": "Lemon"
+      },
+      "lemon-shade": {
+        "role": "secondary",
+        "displayName": "Lemon shade"
+      },
+      "teal": {
+        "role": "secondary",
+        "displayName": "Teal"
+      },
+      "teal-shade": {
+        "role": "secondary",
+        "displayName": "Teal shade"
+      },
+      "slate": {
+        "role": "secondary",
+        "displayName": "Slate"
+      },
+      "slate-shade": {
+        "role": "secondary",
+        "displayName": "Slate shade"
       }
     },
     "typographyMeta": {
@@ -62,8 +102,8 @@
     "shadows": [
       {
         "name": "stone-face",
-        "value": "inset 0 4px 0 #ffffff30,inset 0 -5px 0 #00000020,inset 4px 0 0 #ffffff15,inset -4px 0 0 #00000017",
-        "purpose": "Hard inset block highlights and shade."
+        "value": "inset 4px 0 0 color-mix(in srgb,var(--block) 80%,white),inset -4px 0 0 color-mix(in srgb,var(--block) 65%,var(--shade)),inset 0 -4px 0 color-mix(in srgb,var(--block) 40%,var(--shade)),inset 0 4px 0 color-mix(in srgb,var(--block) 84%,white)",
+        "purpose": "4px stone-face bevels from each existing fill/shade pair; clipped with the face corners and uncertainty mask."
       },
       {
         "name": "toast",
@@ -96,6 +136,11 @@
         "name": "completion",
         "value": "1s",
         "purpose": "Canvas pixel particles; omitted for reduced motion."
+      },
+      {
+        "name": "blocked-beacon",
+        "value": "6s directional light sweep and linear reflector rotation; light raster updates at 20fps",
+        "purpose": "Amber illumination on a fixed pixel grid behind manually blocked sites. Pauses offscreen and while the tab is hidden. Reduced motion uses a steady light pool and static reflector; motion never changes work state."
       },
       {
         "name": "reduced-motion",
@@ -133,7 +178,7 @@
       "joint": "0px",
       "placement": "Solid colored rectangles pack without overlap against body contact edges or dependency depth floors. Uncertainty adds no collision padding.",
       "excavation": "Completed colored bodies reserve their exact bounds; exposed top-face intervals open shafts to the surface. Shafts and cavities paint as one clipped dark union.",
-      "growth": "Bounded viewport scrolls independently. Wheel, middle drag, Space drag, and bottom-edge dragging open deeper ground. Both horizontal directions remain unbounded. Terrain is painted only near the viewport.",
+      "growth": "Bounded viewport scrolls independently, with world depth derived from content and layout at a minimum of 1160px. Work and placement previews can extend depth; vertical scrolling, panning, and bottom-edge autoscrolling do not generate empty ground. Both horizontal directions remain unbounded. Terrain and discoveries are painted only near the viewport.",
       "resize": {
         "handles": [
           "n",
@@ -157,9 +202,29 @@
         "interaction": "Drag from a prerequisite output onto dependent work; keyboard/click source then target also works. Multiple prerequisites; no self, duplicate, or cyclic links.",
         "ordering": "Stable topological packing keeps every dependent below its prerequisites. Overhead body projections additionally determine which top-face intervals are accessible to diggers."
       },
-      "uncertaintyVisual": "4px ordered Bayer alpha mask on the colored face, texture, and cracks. Higher uncertainty removes a greater vertical middle region. The final bottom pixels return to solid color. 0% is solid. Readable labels and controls remain unmasked; outer speckles and collision padding are removed.",
+      "uncertaintyVisual": "Alpha mask seeded at 28% across the full body beneath opaque 4px ordered Bayer pixels. Higher uncertainty enlarges the obscured vertical middle; soil texture shows through its faint block tint while the full estimated footprint stays discernible. Known material and the final bottom pixels remain opaque. 0% uses mask:none. Face, inset bevels, texture, and cracks share the mask and stepped corner clip. Readable labels and controls remain unmasked; outer speckles and collision padding are removed.",
+      "availability": "Ready work keeps its chosen stone color, including unassigned ready work. Buried, prerequisite-waiting, and manually blocked work applies the same saturate(.74) brightness(.95) filter to the stone surface and number/title group, keeping ink and color backings consistent. Diggers, crew, presence, and barriers retain their colors; the uncertainty mask is unchanged. Number, title, and any progress percentage remain visible; accessible descriptions and details explain availability. Drag previews update the treatment from the preview layout. Completed cards retain their Cleared label.",
       "layoutVersion": 3,
       "fractures": "Deterministic edge-rooted lightning trees. Progress extends connected jagged trunks inward and reveals smaller forks and secondary branches; 2px/1px weights remain fixed. Shared uncertainty mask."
+    },
+    "keyboardNavigation": {
+      "formFocus": "New and edit block popups focus the title immediately; saving returns focus to the saved block and brings its world footprint into view.",
+      "newBlock": "Idle-canvas N creates below the last-created unfinished block, then the selected unfinished block, inheriting its color and width; otherwise it uses normal creation. Existing sign-in requirements apply.",
+      "goToBlock": "G opens the bottom-center Go to block form and focuses its numeric text field. Stable block numbers support multiple digits with a 650ms typing pause; Enter or Go submits immediately. Missing numbers show an inline status error and invalid field. Escape, Close, or outside click cancels.",
+      "navigation": "Select and focus the target, center its world footprint, and fit within 60\u2013100% zoom. Completed work reveals its cavity card with browser-local visibility and stays completed. Smooth scrolling becomes immediate under reduced motion. Available to signed-out viewers.",
+      "guards": "Ignore typing, composition, held-key repeats, Command/Ctrl/Alt combinations, open dialogs, menus and forms, and active drag/pan gestures."
+    },
+    "blockedSites": {
+      "control": "Labeled native checkbox with switch semantics before progress in unfinished block details; 38\u00d724px pill track and 16px thumb, amber when checked. Uses existing focus and signed-out disabled behavior.",
+      "barrier": "Centered 112\u00d744px striped pixel construction barrier above the stone face, with square feet and a slowly rotating amber beacon. Decorative and pointer-transparent; phase captions avoid its bounds.",
+      "lighting": "Fixed 144\u00d7108 raster scaled to 576\u00d7432 world pixels in 4px cells, screen-blended behind the stone face and details. Directional amber sweep with faint spill, bright yellow near the lamp and deeper ochre toward shadows. Exponential and edge falloff with stationary Bayer dithering fades into darkness without blur or pixel-grid rotation.",
+      "status": "The block\u2019s accessible description and details popup explain manual closure separately from prerequisite waiting and buried work. The barrier and beacon remain nontext cues; live block faces show no routine status badge.",
+      "behavior": "Enabling clears every assignment atomically with the flag and prevents assignment and progress. Disabling removes the barrier and leaves assignments empty. Existing progress, dimensions, uncertainty, and dependencies remain intact. The flag saves, syncs, and participates in undo/redo."
+    },
+    "diggerAppearance": {
+      "hardhat": "Hardhats have a narrower, taller crown, a projecting brim with a shaded underside, and one raised central rib with two side ribs. Highlights and shadows derive from the worker's chosen helmet color.",
+      "headphones": "Headphones sit beneath the hardhat. The fitted band is concealed inside the helmet shell, while the ear cups remain visible below the brim. This layering preserves the crown, raised ribs, and brim across poses, facing directions, and glasses settings.",
+      "face": "Faces use a symmetrical 16px-wide silhouette with paired ears and a centered chin. Both forward-facing eyes are 2\u00d72px pupils on the same row, spaced 8px apart. Glasses use matching 6\u00d76px frames with centered 4\u00d74px inner lenses; pupils remain visible above the lens fill. The face and glasses stay aligned through bobbing poses, mirrored facing, hair, headphones, and the existing hardhat."
     },
     "diggerAnimation": {
       "clock": "Independent seeded clock per person/site, preserved across rerenders; phase and 155\u2013235ms pickaxe tempo vary.",
@@ -174,11 +239,32 @@
       "progress": "Ambient only; no task or save mutations. Reduced motion is stationary."
     },
     "workspace": {
-      "layout": "One canvas filling available width and height; no permanent sidebars. 52px header, 64px project row, 44px toolbar, compact 30px legend; 12px gutters.",
-      "crew": "236px floating top-left tray with sprite, name, and site count; collapses to 104px. Mobile starts collapsed. Existing drag and click assignment interactions remain.",
-      "inspector": "Native nonmodal popover on block/cavity click, 344px wide with max 660px height and 12px viewport clamp. Progress/unknown/assignments first; Size & prerequisites expandable. Compact notes and assignment chips.",
+      "layout": "One canvas filling available width and height; no permanent sidebars or separate project action strip. 52px header, 44px toolbar, compact 30px legend; 12px gutters. Below 680px: 44px header, 76px two-row toolbar, 6px gutters; all controls remain available.",
+      "crew": "236px floating tray, initially at top left, with sprite, name, and placement LEDs; collapses to 104px. Mobile starts collapsed. Existing drag and click assignment interactions remain. The Crew header has a move icon, grab/grabbing cursors, and a focusable Move crew palette button using the existing green focus color. Dragging moves the tray in screen space within the canvas with an 8px edge inset, independently of terrain pan and zoom. Arrow keys move 8px, Shift moves 32px, Home resets, and Escape cancels an active drag. Browser-local normalized position survives reload, viewport resizing, and expand/collapse without project sync or undo history. Manage crew and collapse retain their actions. Phase captions recalculate their obstacle around the moved tray.",
+      "inspector": "Native nonmodal popover on block/cavity click, 344px wide with natural content height capped at min(660px, viewport height minus 24px) and 12px viewport clamp. Fixed chrome keeps Close available above an independently scrolling body. The shared styles.css #inspector rule uses flex: 1 1 auto and min-height: 0; preserve its content basis to prevent Safari auto-height collapse. Progress/unknown/assignments first; Size & prerequisites expandable. Compact notes and assignment chips.",
       "dismissal": "Escape, Close, outside click, or canvas wheel/pan. Keyboard activation supported and focus returns to the source on explicit close. Save/create returns to canvas.",
-      "completed": "Cleared menu in the toolbar and existing cavity markers. Reset is in Help."
+      "completed": "Cleared menu in the toolbar and existing cavity markers. Reset is in Help.",
+      "toolbar": "Project name, demo badge, crew presence, Cleared, and Phases share the toolbar. Add block sits immediately after Undo/Redo and before zoom/reset. Mobile puts project name, Cleared, and Phases above the complete action row.",
+      "projectDetails": "Header/toolbar project-name buttons and the surface sign open the native Edit project modal. Required project name and optional sign subtitle, each up to 80 characters. Explicit Save changes trims and commits both as one undoable shared edit. Cancel/Close/Escape discard; focus changes do not save. Remote updates defer while the draft is open. Paper dialog at most 420px wide with viewport-clamped scrolling and 16px mobile fields.",
+      "terrainProps": "Decorative fixed-world pixel scenery follows terrain pan and zoom without project state or interactions. Blue porta-potty remains on the main terrain at x=840, y=12, base y=88, beside the surface fence; pale roof, inset vented door, latch, and green vacant indicator. A separate viewport-windowed discovery canvas paints scattered dinosaur remains at x=328, top y=576 (60 8px units below the surface): skull, separated short tail, two ribs, and one thigh in muted bone tones at 0.45 opacity. A helmeted dwarf at x=768, top y=1536 (180 units) has a full copper beard, dark sideburns, two alternating braided locks with gold clasps and tapered ends, a curled moustache, raised brow, rosy cheeks, and a crooked toothy grin. Leather suspenders and wide planted boots anchor six 180ms pickaxe poses: ready, windup, lift, strike, follow-through, and recovery, with shoulder lean, bobbing, a two-handed grip, and impact sparks. A shadowy winged, horned balrog at x=464, top y=2016 (240 units) stands 24px into a stepped rock arch with a soot-dark chamber, warm faceted stones, rubble, and an ember-strewn floor. Eight idle poses over 2880ms combine breathing and expanding shoulders, weight shifts on planted boots and bent legs, wing flex and droop, head turns and eyelids, and arm and whip sway. Fire, coals, and rising embers use separate 180ms stepped flicker. Cave and all poses fit the 248px discovery height used for viewport culling. Full live-block footprints, including uncertain regions, and all cavities and shafts are cleared from discoveries. The existing animation loop refreshes discoveries at about 140ms intervals; reduced motion is static, and hidden pages pause.",
+      "surfaceSign": "Timber sign at world x=280; DOM text at x=294 shares the exported scene origin. Clear of expanded desktop and default collapsed mobile crew. Shovel at x=580. Project name always present in Pixel type; optional DM subtitle below. Blank omits subtitle; long lines ellipsize with full-text tooltip. Keyboard-accessible edit button.",
+      "zoom": "Command/Ctrl plus scroll over the excavation zooms 60\u2013135% around the cursor. Ordinary scrolling is unchanged. Nonpassive prevention owns modified scrolling even at limits; active drag/pan gestures and the project modal guard changes. Local view state only."
+    },
+    "remoteSelections": {
+      "appearance": "Active remote selections retain matching colored rings. Each of up to four distinct people has a 28px circle in their presence color, with a 2px cream border and white semibold 10px initials. A matching 20\u00d724px SVG cursor arrow above-left points into the block, with a 2px cream stroke.",
+      "layout": "The first circle is centered on the block\u2019s bottom-right corner, half overhanging both edges. Additional circles extend side by side to the left at 34px intervals. Inverse scaling below 100% terrain zoom preserves the markers\u2019 on-screen size.",
+      "accessibility": "The selection\u2019s accessible label retains every selecting person\u2019s full name. Visual markers are aria-hidden and the overlay uses pointer-events: none."
+    },
+    "placementSlots": {
+      "appearance": "One crisp 6\u00d76px stepped, recessed pixel LED per available placement in crew palette buttons and the active Manage crew roster. Unused slots are dim; assigned slots are active green. Hard pixel edges remain distinct in both states.",
+      "layout": "Up to four columns and two rows for one to eight slots. Exact assignment counts remain in accessible labels and tooltips.",
+      "control": "Manage crew uses a labeled native Placements per digger number field with visible up/down steppers and an explicit Save limit action, using existing field and button styles. The field is required and accepts integers from one to eight with step one. Clearing it preserves a blank editing draft; a successful save normalizes the displayed number. Width is 88px with a 40px desktop minimum height; below 680px, the field and Save limit action have a 44px minimum height, and the field font is 16px. The project defaults to two placements per digger, including older projects. The active roster scrolls within the dialog to keep controls and the footer reachable on short mobile screens."
+    },
+    "brandMark": {
+      "asset": "assets/shovel.svg",
+      "appearance": "Centered pixel shovel with a compact solid copper T-grip, timber shaft, brass collar, and shaded teal steel blade with symmetric sides that remain full-width to y=28 before tapering through unequal orthogonal pixel steps to a softened four-pixel-wide tip across the bottom two rows, rivets, and a central ridge. The narrower, taller blade spans 16\u00d718 units (x=8\u201324, y=18\u201336) within the 32\u00d736px grid. The horizontal T-bar is 12px wide and 4px high, 75% of the blade\u2019s width. Silhouette, shading, and ridge use only horizontal and vertical path segments.",
+      "usage": "Static decorative header image beside the Silkscreen wordmark, also used as the favicon. Preserve the green period and cream-paper setting.",
+      "responsive": "32\u00d736px on desktop; 28\u00d732px below 680px; hidden at 360px and below."
     }
   },
   "components": [
@@ -238,17 +324,24 @@
     {
       "name": "Workspace header",
       "kind": "nav",
-      "description": "Wordmark and workspace context from the single-screen header.",
-      "html": "<header class=\"ds-header\"><a class=\"ds-brand\" href=\"#\">diggy<span>.</span></a><i></i><span class=\"ds-workspace\">The workshop</span></header>",
-      "css": ".ds-header{font-family:var(--font,DM,sans-serif);display:flex;align-items:center;gap:24px;padding:0 40px;height:76px;border-bottom:1px solid var(--line,#dfdfd1);background:var(--paper,#f5f3e9);color:var(--ink,#303c30)}.ds-brand{font:29px Pixel;letter-spacing:-1px;text-decoration:none;color:inherit}.ds-brand span{color:#7e9457}.ds-header i{height:24px;width:1px;background:var(--line,#dfdfd1)}.ds-workspace{font-size:13px;color:var(--muted,#626b5b)}.ds-brand:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}"
+      "description": "Static pixel shovel and Silkscreen wordmark beside editable project context; the project button opens Edit project. The shovel asset is also the favicon.",
+      "html": "<header class=\"ds-header\"><a class=\"ds-brand\" href=\"#\" aria-label=\"Diggy home\"><svg class=\"ds-brand-shovel\" width=\"32\" height=\"36\" aria-hidden=\"true\" xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 32 36\" fill=\"none\" shape-rendering=\"crispEdges\">\n  <path fill=\"#2d4b40\" d=\"M11 0h10v1h1v3h-4v18h-4V4h-4V1h1V0Z\"/>\n  <path fill=\"#d88958\" d=\"M12 1h8v2h-8z\"/>\n  <path fill=\"#efb17b\" d=\"M13 1h6v1h-6z\"/>\n  <path fill=\"#b88149\" d=\"M14 4h4v18h-4z\"/>\n  <path fill=\"#e5ba77\" d=\"M15 4h2v18h-2z\"/>\n  <path fill=\"#2d4b40\" d=\"M8 18h16v10h-1v2h-2v2h-2v2h-1v2h-4v-2h-1v-2h-2v-2H9v-2H8V18Z\"/>\n  <path fill=\"#77a79b\" d=\"M10 20h12v8h-1v1h-2v2h-2v2h-2v-2h-2v-2h-2v-1h-1v-8Z\"/>\n  <path fill=\"#b3d1bc\" d=\"M10 20h4v2h-2v6h-2v-8Z\"/>\n  <path fill=\"#507e75\" d=\"M20 23h2v5h-1v1h-2v2h-2v2h-1v-2h1v-2h1v-1h2v-5Z\"/>\n  <path fill=\"#d5e3c6\" d=\"M15 22h2v10h-2z\"/>\n  <path fill=\"#2d4b40\" d=\"M12 16h8v6h-8z\"/>\n  <path fill=\"#e4b55d\" d=\"M14 16h4v4h-4z\"/>\n  <path fill=\"#f0cf83\" d=\"M14 16h4v2h-4z\"/>\n  <path fill=\"#d5e3c6\" d=\"M11 20h2v2h-2zm8 0h2v2h-2z\"/>\n</svg><span>diggy<span class=\"ds-brand-period\">.</span></span></a><i></i><button class=\"ds-project\" type=\"button\" aria-label=\"Edit project: The next release\">The next release<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m16 3 5 5-12 12H4v-5L16 3Z\"/></svg></button></header>",
+      "css": ".ds-header{font-family:var(--font,DM,sans-serif);display:flex;align-items:center;gap:18px;padding:0 20px;height:52px;border-bottom:1px solid var(--line,#dfdfd1);background:var(--paper,#f5f3e9);color:var(--ink,#303c30)}.ds-brand{display:flex;align-items:center;gap:10px;font:26px Pixel;letter-spacing:-1px;text-decoration:none;color:inherit}.ds-brand-shovel{display:block;flex:none;width:32px;height:36px;image-rendering:pixelated}.ds-brand-period{color:#7e9457}.ds-header i{height:24px;width:1px;background:var(--line,#dfdfd1)}.ds-project{display:flex;align-items:center;gap:6px;min-width:0;min-height:32px;padding:4px 6px;border:1px solid transparent;border-radius:4px;background:transparent;color:inherit;font:13px var(--font,DM,sans-serif);cursor:pointer}.ds-project svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7}.ds-project:hover{background:var(--panel,#faf9f3);border-color:var(--line,#dfdfd1)}.ds-brand:focus-visible,.ds-project:focus-visible{outline:2px solid var(--focus,#779d48);outline-offset:2px}@media(max-width:680px){.ds-header{height:44px;padding:0 12px;gap:12px}.ds-brand{font-size:23px}.ds-brand-shovel{width:28px;height:32px}}@media(max-width:360px){.ds-header .ds-brand-shovel{display:none}}"
     },
     {
       "name": "Work block",
       "kind": "custom",
-      "description": "Known amber work with the implemented stone face and selection state.",
-      "html": "<button class=\"ds-block\"><span class=\"ds-code\">DIG-01</span><strong>Authentication</strong><span class=\"ds-status\">Digging together</span></button>",
-      "css": ".ds-block{font-family:var(--font,DM,sans-serif);display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:250px;height:148px;padding:15px 16px;background:#ddb472;color:#332b27;border:0;border-radius:1px;box-shadow:inset 0 4px 0 #ffffff30,inset 0 -5px 0 #00000020,inset 4px 0 0 #ffffff15,inset -4px 0 0 #00000017;outline:2px solid #fbf0bd;outline-offset:5px;cursor:grab}.ds-code{font:12px Pixel;opacity:.78;letter-spacing:.3px}.ds-block strong{font-size:20px;font-weight:600;line-height:1.25;margin-top:8px}.ds-status{font-size:12px;margin-top:auto;padding-top:8px}.ds-block:hover{filter:brightness(1.06)}.ds-block:focus-visible{outline:3px solid #fff5c4;outline-offset:6px}",
+      "description": "Amber work at maximum unknown: a 28% full-body tint beneath opaque 4px Bayer pixels reveals soil texture while preserving the estimated footprint. Number 1 and title remain unmasked, with no routine status badge. Ready stone retains its chosen color; unavailable stone and the number/title ink and backing share the same subtle muted treatment. Stored IDs and codes are unchanged.",
+      "html": "<div class=\"ds-ground\"><button class=\"ds-block\" aria-label=\"Block 1, Authentication, 0% complete, 100% unknown. Ready\"><span class=\"ds-block-surface\" aria-hidden=\"true\"></span><span class=\"ds-task-content\"><span class=\"ds-code\">1</span><strong>Authentication</strong></span></button></div>",
+      "css": ".ds-ground{display:inline-block;padding:16px;background-color:#4a3e32;background-image:repeating-linear-gradient(0deg,transparent 0 12px,#2f2c2740 12px 16px),repeating-linear-gradient(90deg,transparent 0 20px,#8d765c30 20px 24px)}.ds-block{--block:var(--amber,#ddb472);--shade:var(--amber-shade,#a07f4b);position:relative;font-family:var(--font,DM,sans-serif);display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:250px;height:148px;padding:15px 16px;background:transparent;color:#332b27;border:0;border-radius:1px;outline:2px solid #fbf0bd;outline-offset:5px;cursor:grab}.ds-block-surface{position:absolute;inset:0;background:var(--block);clip-path:polygon(4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px),0 4px,4px 4px);box-shadow:inset 4px 0 0 color-mix(in srgb,var(--block) 80%,white),inset -4px 0 0 color-mix(in srgb,var(--block) 65%,var(--shade)),inset 0 -4px 0 color-mix(in srgb,var(--block) 40%,var(--shade)),inset 0 4px 0 color-mix(in srgb,var(--block) 84%,white);pointer-events:none;mask-image:url(\"data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22250%22%20height%3D%22148%22%20viewBox%3D%220%200%20250%20148%22%3E%3Crect%20width%3D%22250%22%20height%3D%22148%22%20fill%3D%22black%22%20fill-opacity%3D%22.28%22%2F%3E%3Cpath%20fill%3D%22black%22%20d%3D%22M0%200h250v4H0ZM0%204h250v4H0ZM0%208h250v4H0ZM0%2012h250v4H0ZM0%2016h250v4H0ZM4%2020h4v4H4ZM12%2020h4v4H12ZM20%2020h4v4H20ZM28%2020h4v4H28ZM36%2020h4v4H36ZM44%2020h4v4H44ZM52%2020h4v4H52ZM60%2020h4v4H60ZM68%2020h4v4H68ZM76%2020h4v4H76ZM84%2020h4v4H84ZM92%2020h4v4H92ZM100%2020h4v4H100ZM108%2020h4v4H108ZM116%2020h4v4H116ZM124%2020h4v4H124ZM132%2020h4v4H132ZM140%2020h4v4H140ZM148%2020h4v4H148ZM156%2020h4v4H156ZM164%2020h4v4H164ZM172%2020h4v4H172ZM180%2020h4v4H180ZM188%2020h4v4H188ZM196%2020h4v4H196ZM204%2020h4v4H204ZM212%2020h4v4H212ZM220%2020h4v4H220ZM228%2020h4v4H228ZM236%2020h4v4H236ZM244%2020h4v4H244ZM0%2024h4v4H0ZM8%2024h4v4H8ZM16%2024h4v4H16ZM24%2024h4v4H24ZM32%2024h4v4H32ZM40%2024h4v4H40ZM48%2024h4v4H48ZM56%2024h4v4H56ZM64%2024h4v4H64ZM72%2024h4v4H72ZM80%2024h4v4H80ZM88%2024h4v4H88ZM96%2024h4v4H96ZM104%2024h4v4H104ZM112%2024h4v4H112ZM120%2024h4v4H120ZM128%2024h4v4H128ZM136%2024h4v4H136ZM144%2024h4v4H144ZM152%2024h4v4H152ZM160%2024h4v4H160ZM168%2024h4v4H168ZM176%2024h4v4H176ZM184%2024h4v4H184ZM192%2024h4v4H192ZM200%2024h4v4H200ZM208%2024h4v4H208ZM216%2024h4v4H216ZM224%2024h4v4H224ZM232%2024h4v4H232ZM240%2024h4v4H240ZM248%2024h2v4H248ZM12%2028h4v4H12ZM28%2028h4v4H28ZM44%2028h4v4H44ZM60%2028h4v4H60ZM76%2028h4v4H76ZM92%2028h4v4H92ZM108%2028h4v4H108ZM124%2028h4v4H124ZM140%2028h4v4H140ZM156%2028h4v4H156ZM172%2028h4v4H172ZM188%2028h4v4H188ZM204%2028h4v4H204ZM220%2028h4v4H220ZM236%2028h4v4H236ZM0%2032h4v4H0ZM8%2032h4v4H8ZM16%2032h4v4H16ZM24%2032h4v4H24ZM32%2032h4v4H32ZM40%2032h4v4H40ZM48%2032h4v4H48ZM56%2032h4v4H56ZM64%2032h4v4H64ZM72%2032h4v4H72ZM80%2032h4v4H80ZM88%2032h4v4H88ZM96%2032h4v4H96ZM104%2032h4v4H104ZM112%2032h4v4H112ZM120%2032h4v4H120ZM128%2032h4v4H128ZM136%2032h4v4H136ZM144%2032h4v4H144ZM152%2032h4v4H152ZM160%2032h4v4H160ZM168%2032h4v4H168ZM176%2032h4v4H176ZM184%2032h4v4H184ZM192%2032h4v4H192ZM200%2032h4v4H200ZM208%2032h4v4H208ZM216%2032h4v4H216ZM224%2032h4v4H224ZM232%2032h4v4H232ZM240%2032h4v4H240ZM248%2032h2v4H248ZM4%20140h4v4H4ZM12%20140h4v4H12ZM20%20140h4v4H20ZM28%20140h4v4H28ZM36%20140h4v4H36ZM44%20140h4v4H44ZM52%20140h4v4H52ZM60%20140h4v4H60ZM68%20140h4v4H68ZM76%20140h4v4H76ZM84%20140h4v4H84ZM92%20140h4v4H92ZM100%20140h4v4H100ZM108%20140h4v4H108ZM116%20140h4v4H116ZM124%20140h4v4H124ZM132%20140h4v4H132ZM140%20140h4v4H140ZM148%20140h4v4H148ZM156%20140h4v4H156ZM164%20140h4v4H164ZM172%20140h4v4H172ZM180%20140h4v4H180ZM188%20140h4v4H188ZM196%20140h4v4H196ZM204%20140h4v4H204ZM212%20140h4v4H212ZM220%20140h4v4H220ZM228%20140h4v4H228ZM236%20140h4v4H236ZM244%20140h4v4H244ZM0%20144h250v4H0Z%22%2F%3E%3C%2Fsvg%3E\");mask-mode:alpha;mask-repeat:no-repeat;mask-size:100% 100%;image-rendering:pixelated}.ds-task-content{position:relative;display:flex;flex-direction:column;align-items:flex-start}.ds-code,.ds-block strong{background:var(--block);box-shadow:4px 0 var(--block),-4px 0 var(--block)}.ds-code{font:12px Pixel;opacity:.78;letter-spacing:.3px}.ds-block strong{font-size:20px;font-weight:600;line-height:1.25;margin-top:8px}.ds-block.ds-is-unavailable>.ds-block-surface,.ds-block.ds-is-unavailable>.ds-task-content{filter:saturate(.74) brightness(.95)}.ds-block:hover{filter:brightness(1.06)}.ds-block:focus-visible{outline:3px solid #fff5c4;outline-offset:6px}",
       "refersTo": "task-block"
+    },
+    {
+      "name": "Go to block",
+      "kind": "nav",
+      "description": "Bottom-center paper form opened by G. Focus the numeric text field; support multi-digit stable block numbers, a 650ms typing pause, immediate Enter/Go, inline missing-number errors, and Escape/Close/outside cancellation. Keep completed targets completed while revealing their local cavity card.",
+      "html": "<form class=\"ds-go-to\" aria-label=\"Go to block\"><label for=\"ds-go-number\">Go to block</label><div class=\"ds-go-controls\"><span aria-hidden=\"true\">#</span><input id=\"ds-go-number\" type=\"text\" inputmode=\"numeric\" pattern=\"[0-9]*\" placeholder=\"Number\" aria-describedby=\"ds-go-hint\"><button class=\"ds-go-submit\" type=\"submit\">Go</button><button class=\"ds-go-close\" type=\"button\" aria-label=\"Close go to block\"><svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"m6 6 12 12M18 6 6 18\"/></svg></button></div><p id=\"ds-go-hint\">Type a number to jump. Enter goes now. Esc cancels.</p></form>",
+      "css": ".ds-go-to{box-sizing:border-box;width:min(360px,100%);padding:14px 16px;background:var(--panel,#faf9f3);border:1px solid var(--line,#dfdfd1);border-radius:8px;box-shadow:0 8px 24px #25301f24;color:var(--ink,#303c30);font:14px/1.5 var(--font,DM,sans-serif)}.ds-go-to>label{display:block;margin-bottom:8px;font-weight:600}.ds-go-controls{display:flex;align-items:center;gap:8px}.ds-go-controls input{min-width:0;width:100%;flex:1;padding:8px 9px;border:1px solid var(--control-border,#d5d9c7);border-radius:4px;background:var(--field,#fffef9);color:inherit;font:inherit;font-variant-numeric:tabular-nums}.ds-go-submit,.ds-go-close{min-height:38px;border:1px solid var(--line,#dfdfd1);border-radius:5px;background:transparent;color:inherit;font:600 13px var(--font,DM,sans-serif);cursor:pointer}.ds-go-submit{padding:9px 15px}.ds-go-close{display:flex;align-items:center;justify-content:center;min-width:30px;padding:6px;border-color:transparent}.ds-go-close svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.7}.ds-go-submit:hover,.ds-go-close:hover{background:var(--panel,#faf9f3);border-color:var(--control-border,#d5d9c7)}.ds-go-controls input:focus-visible,.ds-go-submit:focus-visible,.ds-go-close:focus-visible{outline:3px solid var(--focus,#779d48);outline-offset:4px}.ds-go-to p{font-size:11px;color:var(--muted,#626b5b);margin:8px 0 0}@media(max-width:680px){.ds-go-controls input{font-size:16px;min-height:44px}.ds-go-submit,.ds-go-close{min-height:44px}}"
     }
   ],
   "narrative": {
@@ -257,7 +350,7 @@
     "keyCharacteristics": [
       "Cream-paper controls around a dark, textured excavation.",
       "Pixel typography for scene labels; DM Sans for readable controls and task names.",
-      "Colored blocks with adjustable uncertainty and several visible diggers.",
+      "Ten work block colors with paired stone shades, chosen from two rows of five swatches; adjustable uncertainty and several visible diggers.",
       "Manual progress, with no date or time axis."
     ],
     "rules": [],

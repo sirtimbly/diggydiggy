@@ -1,23 +1,34 @@
+import { activeCrew, saveCrewMember, archiveCrewMember, placementLimit, setPlacementLimit } from "./crew.js";
+import { setBlockBlocked } from "./blocking.js";
+import { DIGGER } from "../../digger-geometry.js";
+import { belowBlockTarget, creationPlacement, insertCreatedBlock } from "./creation.js";
+import { createBlockColorPreference } from "./color-preference.js";
+import { blockByNumber, canvasTargetPlan, nextBlockTarget } from "./navigation.js";
+import { canvasShortcut } from "./shortcuts.js";
+import { DIVIDER_COLORS, dividerPosition, saveDivider } from "./dividers.js";
 import {
   MASONRY,
   blockDimensions,
   applyMasonry,
   previewMove,
   previewResize,
+  previewGrowToEdge,
   dependenciesOf,
   canAddDependency,
 } from "../../masonry.js";
 import { installCanvasPanning } from "../../canvas-pan.js";
-import { PALETTE, PEOPLE, demo } from "./project.js";
-import { createSceneRenderer } from "../rendering/scene.js";
+import { installCanvasZoom } from "../../canvas-zoom.js";
+import { projectPalette, validColorLegend } from "./color-legend.js";
+import { PALETTE, demo, STORAGE, PROJECT_NAME_LIMIT, PROJECT_SUBTITLE_LIMIT } from "./project.js";
+import { createSceneRenderer, SURFACE_SIGN_LEFT } from "../rendering/scene.js";
 import { createWorkerAnimator } from "../rendering/workers.js";
 import {
-  pixelLine,
   drawSprite,
   drawUncertainty,
   drawCracks,
 } from "../rendering/pixels.js";
 import { createProjectStore } from "./store.js";
+import { guardProjectEdits } from "./edit-access.js";
 import { hash, rng } from "../rendering/random.js";
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
@@ -25,12 +36,13 @@ const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 // Project commands and pointer gestures coordinate the pure placement model with
 // React's committed scene. Pointer previews and canvas pixels stay off React's
 // render loop; a commit replaces only the transient scene, preserving form state.
-export function createProjectController(commit) {
+export function createProjectController(commit, { storageKey, initial, isShared = false, preferInitial = false } = {}) {
   const WORLD = { left: 0, right: 900, width: 900, height: 1160 };
   let disposed = false,
     sceneRevision = 0,
     toast = "",
     canvasPanning;
+  let canEdit = false, accountLoading = true;
   const listeners = [],
     frames = new Set();
   function listen(target, type, handler, options) {
@@ -46,14 +58,41 @@ export function createProjectController(commit) {
     return id;
   }
   const store = createProjectStore({
+    canEdit: () => canEdit,
+    key: storageKey,
+    initial,
+    preferInitial,
     storage: {
       getItem: (key) => localStorage.getItem(key),
       setItem: (key, value) => localStorage.setItem(key, value),
     },
   });
   let state = store.getProject();
+  const colorPreference = createBlockColorPreference({
+    getItem: (key) => localStorage.getItem(key),
+    setItem: (key, value) => localStorage.setItem(key, value),
+  });
+  const clearedVisibilityKey = `${storageKey ?? STORAGE}:visible-cleared`;
+  const visibleClearedIds = new Set();
+  try {
+    const saved = JSON.parse(localStorage.getItem(clearedVisibilityKey) ?? "[]");
+    if (Array.isArray(saved)) for (const id of saved.slice(0,100))
+      if (typeof id === "string" && state.blocks.some((block) => block.id===id && block.done)) visibleClearedIds.add(id);
+  } catch { /* View preferences are optional when browser storage is unavailable. */ }
+  function persistClearedVisibility() {
+    try { localStorage.setItem(clearedVisibilityKey,JSON.stringify([...visibleClearedIds])); } catch { /* Keep the current view usable in memory. */ }
+  }
   let storageAvailable = store.getStatus().storageAvailable;
   let editGroup = null;
+  let sync = { status: "local", pending: 0, inviteUrl: "", error: "" };
+  let presence = { selfId: null, peers: [] };
+  const viewListeners = new Set();
+  let shareOpen = false;
+  let projectDetailsOpen = false;
+  let disposeCanvasZoom;
+  let crewOpen = false, crewEditing = false;
+  let dividerEditor = null;
+  let syncHandlers = {};
   let selectedDigger = null;
   let pendingLink = null;
   let currentLayout = null;
@@ -61,6 +100,10 @@ export function createProjectController(commit) {
   let inspectorMoreOpen = false;
   let crewCollapsed = matchMedia("(max-width:680px)").matches;
   let mode = "inspect";
+  let lastCreatedId = null;
+  let goToOpen = false;
+  let newBlockTarget = null;
+  let newBlockColor = colorPreference.initialColor();
   let zoom = 1;
   let drag = null;
   let toastTimer;
@@ -82,30 +125,46 @@ export function createProjectController(commit) {
     get currentLayout() {
       return currentLayout;
     },
+    get reducedMotion() { return reducedMotion.matches; },
     WORLD,
   });
-  const { drawTerrain, drawDependencies, updateDependencyEmphasis } = scene;
-  const workers = createWorkerAnimator({ getDrag: () => drag, reducedMotion });
+  const { drawTerrain, drawDependencies, updateDependencyEmphasis, drawDiscoveries } = scene;
+  const workers = createWorkerAnimator({ getDrag: () => drag, getPeople: () => state.crew, reducedMotion });
   const cacheSprites = () => workers.cacheSprites();
   function getView() {
     return {
       state,
+      canEdit,
+      accountLoading,
+      isShared,
+      visibleClearedIds: new Set(visibleClearedIds),
       selectedDigger,
       crewCollapsed,
       mode,
+      goToOpen,
+      newBlockTarget,
+      newBlockColor,
       inspectorMoreOpen,
       sceneRevision,
       world: { ...WORLD },
       zoom,
       storageAvailable,
       history: store.getStatus(),
+      sync,
+      presence,
+      shareOpen,
+      projectDetailsOpen,
+      crewOpen,
+      dividerEditor,
+      dividerPreview: drag?.kind === "divider" ? drag.dividerPreview : null,
+      dividerObstacles: dividerObstacles(),
       toast,
       isBlocked,
       waitingDependencies,
       blockedReason,
       getBlock,
       placedDiggers,
-      activeCount: PEOPLE.filter((p) =>
+      activeCount: activeCrew(state).filter((p) =>
         state.blocks.some(
           (b) => !b.done && !isBlocked(b) && b.people.includes(p.id),
         ),
@@ -113,9 +172,21 @@ export function createProjectController(commit) {
     };
   }
   function publish() {
-    if (!disposed) commit(getView());
+    if (!disposed) {
+      const view = getView();
+      commit(view);
+      for (const listener of viewListeners) listener(view);
+    }
   }
   function save(label = "Edit project") {
+    if (!canEdit) {
+      const selected = state.selected;
+      store.persistSelection(selected);
+      state = store.getProject();
+      state.selected = selected;
+      publish();
+      return;
+    }
     store.commit(state, { label, group: editGroup });
     storageAvailable = store.getStatus().storageAvailable;
     publish();
@@ -125,7 +196,8 @@ export function createProjectController(commit) {
     store.endGroup();
   }
   function travelHistory(kind) {
-    if (drag || canvasPanning?.active || mode !== "inspect") return false;
+    if (!canEdit) return requireSignIn();
+    if (drag || canvasPanning?.active || mode !== "inspect" || dividerEditor || projectDetailsOpen) return false;
     endEdit();
     const result = store[kind]();
     if (!result) return false;
@@ -156,6 +228,11 @@ export function createProjectController(commit) {
       publish();
     }, 3500);
   }
+  function requireSignIn() {
+    notify("Sign in to make changes to this project.");
+    $("#account-menu")?.showPopover();
+    return false;
+  }
   function getBlock(id) {
     return state.blocks.find((b) => b.id === id);
   }
@@ -164,28 +241,29 @@ export function createProjectController(commit) {
       state.blocks.some((a) => a.id === id && !a.done),
     );
   }
-  function isBlocked(b) {
+  function isBlocked(b, layout = currentLayout) {
     return (
-      waitingDependencies(b).length > 0 ||
-      currentLayout?.access.get(b.id)?.reachable === false
+      b.blocked === true || waitingDependencies(b).length > 0 ||
+      layout?.access.get(b.id)?.reachable === false
     );
   }
   function blockedReason(b) {
+    if (b.blocked) return "This site is blocked. Unblock it when the way is clear.";
     return waitingDependencies(b).length
       ? "Another block comes first."
       : "Clear the stone above to reach this surface.";
   }
   function placedDiggers(b, layout = currentLayout) {
-    if (waitingDependencies(b).length || !layout?.access.get(b.id)?.reachable)
+    if (b.blocked || waitingDependencies(b).length || !layout?.access.get(b.id)?.reachable)
       return [];
     const spots = [];
     for (const [index, r] of layout.access.get(b.id).ranges.entries())
-      for (let x = r.x; x + 32 <= r.x + r.width; x += 40)
+      for (let x = r.x; x + DIGGER.width <= r.x + r.width; x += DIGGER.width + DIGGER.gap)
         spots.push({
           x: x - layout.placements.get(b.id).x,
           range: index,
           min: r.x - layout.placements.get(b.id).x,
-          max: r.x + r.width - 32 - layout.placements.get(b.id).x,
+          max: r.x + r.width - DIGGER.width - layout.placements.get(b.id).x,
         });
     const count = Math.min(b.people.length, spots.length);
     const selected = Array.from(
@@ -202,9 +280,9 @@ export function createProjectController(commit) {
       const before = selected[i - 1],
         after = selected[i + 1];
       const min =
-        before?.range === spot.range ? (before.x + spot.x) / 2 + 20 : spot.min;
+        before?.range === spot.range ? (before.x + spot.x + DIGGER.width + DIGGER.gap) / 2 : spot.min;
       const max =
-        after?.range === spot.range ? (after.x + spot.x) / 2 - 20 : spot.max;
+        after?.range === spot.range ? (after.x + spot.x - DIGGER.width - DIGGER.gap) / 2 : spot.max;
       return {
         id: b.people[i],
         x: Math.max(min, Math.min(max, spot.x)),
@@ -217,7 +295,19 @@ export function createProjectController(commit) {
     block.dependencies = [...new Set(ids)];
     block.dependency = block.dependencies[0] ?? "";
   }
+  function dividerObstacles() {
+    const layout = drag?.preview ?? currentLayout;
+    if (!layout) return [];
+    return [...(state.excavations ?? []).map((hole) => visibleClearedIds.has(hole.blockId) ? hole : ({x:hole.x+hole.width/2-65,
+      y:hole.y+hole.height/2-14,width:130,height:28})), ...state.blocks.filter((block) => !block.done).flatMap((block) => {
+      const body = layout.placements.get(block.id)?.slot;
+      if (!body) return [];
+      return [body, ...(block.blocked ? [{x:body.x+body.width/2-56,y:body.y-44,width:112,height:44}] : []), ...placedDiggers(block,layout).map((spot) => ({x:body.x+spot.min,
+        y:body.y-DIGGER.height, width:spot.max-spot.min+DIGGER.width, height:DIGGER.height}))];
+    })];
+  }
   function addDependency(sourceId, targetId) {
+    if (!canEdit) return requireSignIn();
     const result = canAddDependency(state.blocks, sourceId, targetId);
     pendingLink = null;
     if (!result.ok) {
@@ -235,6 +325,10 @@ export function createProjectController(commit) {
     return true;
   }
   function syncWorldBounds(layout, growOnly = false) {
+    const markers = [...(state.dividers ?? []), ...(drag?.dividerPreview ? [drag.dividerPreview] : [])];
+    layout = {...layout, left:Math.min(layout.left,...markers.map((d) => d.x-48)),
+      right:Math.max(layout.right,...markers.map((d) => d.x+360)),
+      height:Math.max(layout.height ?? WORLD.height,...markers.map((d) => d.y+240))};
     const view = $("#pit-viewport"),
       oldLeft = WORLD.left;
     WORLD.left = growOnly ? Math.min(WORLD.left, layout.left) : layout.left;
@@ -254,14 +348,14 @@ export function createProjectController(commit) {
     const shift = oldLeft - WORLD.left;
     if (shift) {
       $$(
-        ".task-block,.excavated-label,#placement-preview,.effect-canvas",
+        ".task-block,.cleared-block,.excavated-label,#placement-preview,.effect-canvas",
       ).forEach((node) => {
         node.style.left = `${parseFloat(node.style.left) + shift}px`;
       });
       view.scrollLeft += shift * zoom;
     }
     $(".surface-sign").style.left =
-      `${(innerWidth <= 680 ? 45 : 58) - WORLD.left}px`;
+      `${SURFACE_SIGN_LEFT + 14 - WORLD.left}px`;
     $$(".depth-label").forEach(
       (node) => (node.style.left = `${15 - WORLD.left}px`),
     );
@@ -277,6 +371,7 @@ export function createProjectController(commit) {
     requestFrame(() => {
       terrainPending = false;
       drawTerrain();
+      if (state.dividers?.length) publish();
     });
   }
 
@@ -304,7 +399,7 @@ export function createProjectController(commit) {
     const popup = $("#inspector-popup");
     if (!popup.matches(":popover-open")) popup.showPopover();
     positionInspector();
-    popup.focus({ preventScroll: true });
+    (mode === "new" || mode === "edit" ? $("#block-title", popup) : popup)?.focus({ preventScroll: true });
   }
   function closeInspector(restoreFocus = false) {
     const popup = $("#inspector-popup");
@@ -314,6 +409,8 @@ export function createProjectController(commit) {
       const target =
         inspectorReturnId === "new-block"
           ? $("#new-block")
+          : getBlock(inspectorReturnId)?.done
+            ? $(`#task-layer [data-cleared="${CSS.escape(inspectorReturnId)}"]`)
           : $(
               `[data-block="${CSS.escape(inspectorReturnId ?? "")}"] .block-hit`,
             );
@@ -347,6 +444,12 @@ export function createProjectController(commit) {
     requestFrame(positionInspector);
   }
   function render() {
+    let visibilityChanged = false;
+    for (const id of visibleClearedIds) if (!state.blocks.some((block) => block.id===id && block.done)) {
+      visibleClearedIds.delete(id); visibilityChanged = true;
+    }
+    if (visibilityChanged) persistClearedVisibility();
+    if (selectedDigger && !activeCrew(state).some((person) => person.id === selectedDigger)) selectedDigger = null;
     const focused = document.activeElement;
     const focusId = focused?.id;
     const focusResize = focused?.dataset.resize;
@@ -381,8 +484,14 @@ export function createProjectController(commit) {
     save();
     openInspector(id);
   }
-  function openNew() {
+  function openNew(target = null) {
+    if (!canEdit) return requireSignIn();
+    if (drag || canvasPanning?.ready || canvasPanning?.active || performance.now() < suppressClickUntil) return;
+    // Global Add controls pass a click event, not a placement target.
+    newBlockTarget = Number.isFinite(target?.x) && Number.isFinite(target?.y) && Number.isFinite(target?.width) ? target : null;
+    newBlockColor = colorPreference.initialColor(newBlockTarget?.afterId ? newBlockTarget.color : undefined);
     selectedDigger = null;
+    goToOpen = false;
     mode = "new";
     renderCrew();
     renderInspector();
@@ -390,9 +499,14 @@ export function createProjectController(commit) {
     openInspector("new-block");
   }
   function assignPerson(personId, blockId, sourceId = null) {
+    if (!canEdit) return requireSignIn();
     const b = getBlock(blockId),
-      p = PEOPLE.find((p) => p.id === personId);
-    if (!b || b.done) return;
+      p = state.crew.find((p) => p.id === personId);
+    if (!b || b.done || !p || p.archived) return;
+    if (b.blocked) {
+      notify("This site is blocked. Unblock it before assigning a digger.");
+      return;
+    }
     if (b.people.includes(personId)) {
       selectedDigger = null;
       state.selected = b.id;
@@ -403,9 +517,9 @@ export function createProjectController(commit) {
     const sites = state.blocks.filter(
       (a) => !a.done && a.id !== sourceId && a.people.includes(personId),
     );
-    if (sites.length >= 2) {
+    if (sites.length >= placementLimit(state)) {
       notify(
-        `${p.name} is already digging in two places. Remove one assignment first.`,
+        `${p.name} has filled all ${placementLimit(state)} placement ${placementLimit(state) === 1 ? "slot" : "slots"}. Remove one assignment first.`,
       );
       return;
     }
@@ -424,6 +538,7 @@ export function createProjectController(commit) {
     );
   }
   function changeProgress(b, amount) {
+    if (!canEdit) return requireSignIn();
     if (b.done || (amount > 0 && isBlocked(b))) return;
     b.progress = Math.max(0, Math.min(100, b.progress + amount));
     if (b.progress === 100) {
@@ -436,15 +551,48 @@ export function createProjectController(commit) {
     render();
     save("Update progress");
   }
+  function navigateToTarget(target, { fit = false, onlyIfOutside = false, behavior } = {}) {
+    if (!target || ![target.x,target.y,target.width,target.height].every(Number.isFinite) || target.width <= 0 || target.height <= 0) return false;
+    const viewport = $("#pit-viewport");
+    const left = WORLD.left + viewport.scrollLeft / zoom, top = viewport.scrollTop / zoom;
+    if (onlyIfOutside && target.x >= left && target.x + target.width <= left + viewport.clientWidth / zoom &&
+      target.y >= top && target.y + target.height <= top + viewport.clientHeight / zoom) return true;
+    const plan = canvasTargetPlan(target, { width: viewport.clientWidth, height: viewport.clientHeight, worldLeft: WORLD.left, zoom, fit });
+    if (plan.zoom !== zoom) setZoom(plan.zoom);
+    viewport.scrollTo({ left: plan.left, top: plan.top, behavior: reducedMotion.matches ? "instant" : (behavior ?? "smooth") });
+    return true;
+  }
+  function blockElement(block) {
+    return block?.done ? $(`#task-layer [data-cleared="${CSS.escape(block.id)}"]`) :
+      $(`[data-block="${CSS.escape(block?.id ?? "")}"] .block-hit`);
+  }
+  function navigateToBlock(id, { select = true, focus = true, ...options } = {}) {
+    const block = getBlock(id);
+    if (!block) return false;
+    const hole = block.done ? state.excavations.find((item) => item.blockId === id) : null;
+    if (block.done && !hole) return false;
+    if (block.done && !visibleClearedIds.has(id)) {
+      visibleClearedIds.add(id);
+      persistClearedVisibility();
+      publish();
+    }
+    if (select) {
+      closeInspector();
+      selectedDigger = null;
+      pendingLink = null;
+      mode = "inspect";
+      inspectorMoreOpen = false;
+      state.selected = id;
+      render();
+      save();
+    }
+    const [width, height] = blockDimensions(block);
+    navigateToTarget(hole ?? { x: block.x, y: block.y, width, height }, options);
+    if (focus) blockElement(block)?.focus({ preventScroll: true });
+    return true;
+  }
   function revealSelected() {
-    const b = getBlock(state.selected);
-    if (!b || b.done) return;
-    const view = $("#pit-viewport");
-    view.scrollTo({
-      left: Math.max(0, (b.x - WORLD.left - 50) * zoom),
-      top: Math.max(0, (b.y - 140) * zoom),
-      behavior: reducedMotion.matches ? "instant" : "smooth",
-    });
+    navigateToBlock(state.selected, { select: false, focus: false });
   }
   function setZoom(value) {
     zoom = Math.min(1.35, Math.max(0.6, value));
@@ -492,7 +640,7 @@ export function createProjectController(commit) {
       const age = (t - start) / 1000;
       c.clearRect(0, 0, canvas.width, canvas.height);
       c.globalAlpha = Math.max(0, 1 - age);
-      c.fillStyle = PALETTE[b.color].fill;
+      c.fillStyle = projectPalette(state)[b.color].fill;
       for (const p of particles) {
         p.x += p.vx;
         p.y += p.vy;
@@ -513,19 +661,24 @@ export function createProjectController(commit) {
   // Canvas navigation takes priority over grabbing blocks, handles, links, or diggers.
   listen(document, "pointerdown", (e) => {
     suppressClickUntil = 0;
+    if (!canEdit) return;
     if (e.button !== 0 || e.target.closest("input,select,textarea")) return;
     const digger = e.target.closest("[data-digger]"),
       block = e.target.closest(".task-block");
+    const divider = e.target.closest("[data-divider-drag]");
     const resize = e.target.closest("[data-resize]");
     const link = e.target.closest("[data-link-out]");
-    if (!digger && !block) return;
-    if (!digger && !resize && !link && !e.target.closest(".block-hit")) return;
-    const el = link || resize || digger || block,
+    if (!digger && !block && !divider) return;
+    if (!divider && !digger && !resize && !link && !e.target.closest(".block-hit")) return;
+    const marker = divider ? state.dividers.find((d) => d.id === divider.dataset.dividerDrag) : null;
+    if (divider && !marker) return;
+    if (divider) endEdit();
+    const el = divider ? $("#pit-viewport") : link || resize || digger || block,
       rect = $("#pit-world").getBoundingClientRect();
     drag = {
-      kind: link ? "link" : resize ? "resize" : digger ? "digger" : "block",
+      kind: divider ? "divider" : link ? "link" : resize ? "resize" : digger ? "digger" : "block",
       edge: resize?.dataset.resize,
-      id: digger?.dataset.digger || block.dataset.block,
+      id: marker?.id || digger?.dataset.digger || block.dataset.block,
       sourceId: digger?.dataset.source || null,
       el,
       startX: e.clientX,
@@ -535,15 +688,15 @@ export function createProjectController(commit) {
       offsetX:
         (e.clientX - rect.left) / zoom +
         WORLD.left -
-        (block ? getBlock(block.dataset.block).x : 0),
+        (marker ? marker.x : block ? getBlock(block.dataset.block).x : 0),
       offsetY:
         (e.clientY - rect.top) / zoom -
-        (block ? getBlock(block.dataset.block).y : 0),
+        (marker ? marker.y : block ? getBlock(block.dataset.block).y : 0),
     };
-    if (!digger) {
+    if (!digger && !divider) {
       drag.baseline = structuredClone(state);
     }
-    el.setPointerCapture(e.pointerId);
+    if (!divider) el.setPointerCapture(e.pointerId);
   });
   function updateDrag(e) {
     if (!drag || e.pointerId !== drag.pointerId) return;
@@ -559,6 +712,17 @@ export function createProjectController(commit) {
       clientY: e.clientY,
     };
     pendingLink = null;
+    if (drag.kind === "divider") {
+      drag.moved = true;
+      if (!drag.el.hasPointerCapture(e.pointerId)) drag.el.setPointerCapture(e.pointerId);
+      const rect = $("#pit-world").getBoundingClientRect();
+      drag.dividerPreview = {...state.dividers.find((d) => d.id === drag.id),
+        ...dividerPosition((e.clientX-rect.left)/zoom+WORLD.left-drag.offsetX,
+          (e.clientY-rect.top)/zoom-drag.offsetY)};
+      syncWorldBounds(WORLD,true);
+      publish();
+      return;
+    }
     if (drag.kind === "link") {
       drag.moved = true;
       pendingLink = null;
@@ -613,14 +777,14 @@ export function createProjectController(commit) {
         ghost.className = "drag-ghost";
         const sprite = document.createElement("canvas");
         sprite.className = "crew-sprite";
-        sprite.width = 32;
-        sprite.height = 40;
+        sprite.width = DIGGER.width;
+        sprite.height = DIGGER.height;
         ghost.append(sprite);
         document.body.append(ghost);
         drag.ghost = ghost;
         drawSprite(
           $("canvas", ghost),
-          PEOPLE.find((p) => p.id === drag.id),
+          state.crew.find((p) => p.id === drag.id),
         );
       }
     }
@@ -664,7 +828,7 @@ export function createProjectController(commit) {
   function panWhileDragging(time) {
     if (
       !drag?.moved ||
-      !["block", "link"].includes(drag.kind) ||
+      !["block", "link", "divider"].includes(drag.kind) ||
       !drag.lastPointer
     )
       return;
@@ -702,11 +866,6 @@ export function createProjectController(commit) {
         { left: WORLD.left, right: WORLD.right + 256, height: WORLD.height },
         true,
       );
-    if (dy > 0 && view.scrollTop + view.clientHeight > view.scrollHeight - 128)
-      syncWorldBounds(
-        { left: WORLD.left, right: WORLD.right, height: WORLD.height + 320 },
-        true,
-      );
     view.scrollLeft += dx;
     view.scrollTop += dy;
     updateDrag(pointer);
@@ -728,7 +887,12 @@ export function createProjectController(commit) {
       d.el.releasePointerCapture(e.pointerId);
     if (d.moved) {
       suppressClickUntil = performance.now() + 200;
-      if (d.kind === "link") {
+      if (d.kind === "divider") {
+        if (!cancel && d.dividerPreview) {
+          state = saveDivider(state,d.id,d.dividerPreview);
+          save("Move divider");
+        } else publish();
+      } else if (d.kind === "link") {
         const target = document
           .elementFromPoint(e.clientX, e.clientY)
           ?.closest("[data-block]");
@@ -766,7 +930,7 @@ export function createProjectController(commit) {
         node = $(`[data-block="${CSS.escape(id)}"]`);
       if (!node) continue;
       const spots = placedDiggers(block, preview);
-      node.classList.toggle("is-idle", spots.length === 0);
+      node.classList.toggle("is-unavailable", isBlocked(block, preview));
       $$(".block-digger", node).forEach((el) => {
         const spot = spots.find((s) => s.id === el.dataset.digger);
         el.hidden = !spot;
@@ -793,6 +957,30 @@ export function createProjectController(commit) {
     marker.style.cssText = `left:${p.x - WORLD.left}px;top:${p.y}px;width:${p.width}px;height:${p.height}px`;
   }
   let suppressClickUntil = 0;
+  function growToNeighborEdge(handle) {
+    if (!canEdit) return requireSignIn();
+    const edge = handle.dataset.resize;
+    if (edge !== "w" && edge !== "e") return;
+    const id = handle.closest("[data-block]").dataset.block;
+    const preview = previewGrowToEdge(state, id, edge);
+    if (!preview.ok) { notify(preview.reason); return; }
+    endEdit();
+    state.blocks = preview.blocks;
+    state.selected = id;
+    selectedDigger = null;
+    pendingLink = null;
+    mode = "inspect";
+    closeInspector();
+    render();
+    save(edge === "w" ? "Align left edge" : "Align right edge");
+    notify(`Aligned with ${getBlock(preview.targetId).title}.`);
+  }
+  listen(document, "dblclick", (e) => {
+    const handle = e.target.closest('[data-resize="w"],[data-resize="e"]');
+    if (!handle || e.button !== 0 || canvasPanning.ready || canvasPanning.active || drag || performance.now() < suppressClickUntil) return;
+    e.preventDefault();
+    growToNeighborEdge(handle);
+  });
   listen(document, "click", (e) => {
     if (
       canvasPanning.ready ||
@@ -802,6 +990,7 @@ export function createProjectController(commit) {
       return;
     const source = e.target.closest("[data-link-out]");
     if (source) {
+      if (!canEdit) return;
       pendingLink =
         pendingLink === source.dataset.linkOut ? null : source.dataset.linkOut;
       drawDependencies();
@@ -812,13 +1001,14 @@ export function createProjectController(commit) {
     if (e.target.closest("[data-resize]")) return;
     const digger = e.target.closest("[data-digger]");
     if (digger) {
+      if (!canEdit) return;
       selectedDigger =
         selectedDigger === digger.dataset.digger ? null : digger.dataset.digger;
       renderCrew();
       cacheSprites();
       if (selectedDigger)
         notify(
-          `${PEOPLE.find((p) => p.id === selectedDigger).name} selected. Pick a block to dig.`,
+          `${state.crew.find((p) => p.id === selectedDigger).name} selected. Pick a block to dig.`,
         );
       return;
     }
@@ -830,15 +1020,41 @@ export function createProjectController(commit) {
     }
     const cleared = e.target.closest("[data-cleared]");
     if (cleared) {
-      state.selected = cleared.dataset.cleared;
-      mode = "inspect";
-      render();
-      save();
+      navigateToBlock(cleared.dataset.cleared, { focus: false, onlyIfOutside: true });
       $(".cleared-menu").open = false;
       openInspector(state.selected);
+      return;
+    }
+    if (state.selected && e.target.closest("main") &&
+      !e.target.closest("button,a,input,select,textarea,summary,[role=button]")) {
+      closeInspector();
+      state.selected = null;
+      mode = "inspect";
+      inspectorMoreOpen = false;
+      // A popover can return focus to its block when it closes. Release that
+      // focus as well, so :focus-within does not leave resize grips visible.
+      if (document.activeElement?.closest(".task-block,.cleared-block")) document.activeElement.blur();
+      save();
+      cacheSprites();
+      updateDependencyEmphasis();
     }
   });
   listen(document, "keydown", (e) => {
+    if (e.defaultPrevented || e.isComposing) return;
+    if (e.key === "Escape" && goToOpen) {
+      e.preventDefault();
+      actions.closeGoTo(true);
+      return;
+    }
+    const shortcut = canvasShortcut(e);
+    if (shortcut && mode === "inspect" && !drag && !canvasPanning?.ready && !canvasPanning?.active &&
+      !crewOpen && !shareOpen && !dividerEditor && !projectDetailsOpen &&
+      !$("dialog[open],details[open],:popover-open:not(#inspector-popup)")) {
+      e.preventDefault();
+      if (shortcut === "new") actions.openNextBlock();
+      else actions.openGoTo();
+      return;
+    }
     if (e.key === "Escape" && drag) {
       finishDrag(
         {
@@ -867,6 +1083,7 @@ export function createProjectController(commit) {
         cacheSprites();
       }
     }
+    if (!canEdit) return;
     const target = e.target.closest(".block-hit"),
       vectors = {
         ArrowUp: [0, -1],
@@ -875,6 +1092,13 @@ export function createProjectController(commit) {
         ArrowRight: [1, 0],
       };
     const handle = e.target.closest("[data-resize]");
+    if (handle && !drag && e.key === "Enter" && !e.repeat && !e.metaKey && !e.ctrlKey && !e.altKey && !canvasPanning.ready && !canvasPanning.active) {
+      if (["w", "e"].includes(handle.dataset.resize)) {
+        e.preventDefault();
+        growToNeighborEdge(handle);
+        return;
+      }
+    }
     if (handle && vectors[e.key]) {
       e.preventDefault();
       const b = getBlock(handle.closest("[data-block]").dataset.block),
@@ -898,10 +1122,12 @@ export function createProjectController(commit) {
       const b = getBlock(target.closest("[data-block]").dataset.block),
         [dx, dy] = vectors[e.key];
       if (dx) {
+        delete b.pinnedY;
         delete b.pinnedX;
         b.pinnedColumn = b.column + dx * (e.shiftKey ? 3 : 1);
       }
       if (dy) {
+        delete b.pinnedY;
         const index = state.blocks.indexOf(b),
           step = e.shiftKey ? 3 : 1;
         state.blocks.splice(index, 1);
@@ -918,6 +1144,186 @@ export function createProjectController(commit) {
   });
 
   const actions = {
+    retryLocalSave() { syncHandlers.retry?.(); },
+    requireSignIn,
+    setAccount(user, loading = false) {
+      accountLoading = loading;
+      const allowed = Boolean(user) && !loading;
+      const changed = canEdit !== allowed;
+      if (!allowed && canEdit) {
+        if (drag) finishDrag({ pointerId: drag.pointerId }, true);
+        endEdit();
+        closeInspector();
+        mode = "inspect";
+        selectedDigger = null;
+        pendingLink = null;
+        projectDetailsOpen = false;
+        crewOpen = false;
+        crewEditing = false;
+        dividerEditor = null;
+      }
+      canEdit = allowed;
+      publish();
+      if (changed) syncHandlers.authenticationChanged?.();
+    },
+    openProjectDetails() {
+      if (drag || canvasPanning?.active || canvasPanning?.ready || performance.now() < suppressClickUntil) return;
+      closeInspector(); endEdit();
+      mode = "inspect";
+      projectDetailsOpen = true;
+      publish();
+    },
+    closeProjectDetails() {
+      if (!projectDetailsOpen) return;
+      projectDetailsOpen = false;
+      publish();
+    },
+    saveProjectDetails(values) {
+      const name = values.name.trim().slice(0, PROJECT_NAME_LIMIT);
+      const subtitle = values.subtitle.trim().slice(0, PROJECT_SUBTITLE_LIMIT);
+      if (!name) return;
+      endEdit();
+      state.name = name;
+      state.subtitle = subtitle;
+      projectDetailsOpen = false;
+      save("Edit project details");
+    },
+    saveColorLegend(entries) {
+      if (!validColorLegend(entries)) return false;
+      endEdit();
+      state.colorLegend = { ...state.colorLegend, ...structuredClone(entries) };
+      save("Edit color legend");
+      return true;
+    },
+    toggleClearedVisibility(id) {
+      const block = getBlock(id);
+      if (!block?.done) return;
+      const showing = !visibleClearedIds.has(id);
+      if (showing) visibleClearedIds.add(id);
+      else {
+        visibleClearedIds.delete(id);
+        if (state.selected === id) {state.selected=null;closeInspector();mode="inspect";save();}
+      }
+      persistClearedVisibility();
+      publish();
+      if (showing) {
+        const hole=state.excavations.find((item) => item.blockId===id);
+        if (!hole) return;
+        navigateToTarget(hole, { onlyIfOutside: true });
+      }
+    },
+    openNewDivider(event) {
+      const viewport = $("#pit-viewport"), anchor = event.currentTarget.getBoundingClientRect();
+      closeInspector();
+      selectedDigger = null;
+      pendingLink = null;
+      dividerEditor = {id:null, label:`Phase ${(state.dividers?.length ?? 0)+1}`,
+        color:Object.keys(DIVIDER_COLORS)[(state.dividers?.length ?? 0)%5],
+        ...dividerPosition(WORLD.left+(viewport.scrollLeft+48)/zoom,(viewport.scrollTop+viewport.clientHeight*.45)/zoom),
+        anchor:{x:anchor.left,y:anchor.bottom}};
+      $(".dividers-menu").open = false;
+      publish();
+    },
+    openDivider(id, target) {
+      if (drag || canvasPanning?.ready || canvasPanning?.active || performance.now()<suppressClickUntil) return;
+      const divider = state.dividers?.find((d) => d.id === id);
+      if (!divider) return;
+      const anchor=target.getBoundingClientRect();
+      closeInspector(); selectedDigger=null; pendingLink=null;
+      dividerEditor = {...divider,anchor:{x:anchor.left,y:anchor.bottom}};
+      $(".dividers-menu").open = false;
+      publish();
+    },
+    closeDivider(returnFocus = false) {
+      const id = dividerEditor?.id;
+      dividerEditor = null;
+      publish();
+      if (returnFocus) ($(`[data-phase="${CSS.escape(id ?? "")}"] .phase-label`) ?? $(".dividers-menu summary"))?.focus({preventScroll:true});
+    },
+    saveDivider(id, values) {
+      endEdit();
+      state = saveDivider(state,id,values);
+      dividerEditor = null;
+      render();
+      save(id ? "Edit divider" : "Add divider");
+      notify(id ? "Divider updated." : "Phase boundary added. Drag its label or line to move it.");
+      $(".dividers-menu summary")?.focus({preventScroll:true});
+    },
+    deleteDivider(id) {
+      endEdit();
+      state.dividers = state.dividers.filter((d) => d.id !== id);
+      dividerEditor = null;
+      render();
+      save("Remove divider");
+      $(".dividers-menu summary")?.focus({preventScroll:true});
+    },
+    nudgeDivider(id, key, larger) {
+      if (drag || canvasPanning?.ready || canvasPanning?.active || dividerEditor) return;
+      const divider=state.dividers?.find((d) => d.id === id);
+      if (!divider) return;
+      const step=larger ? 32 : 8, vector={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[key];
+      if (!vector) return;
+      endEdit();
+      state=saveDivider(state,id,{...divider,...dividerPosition(divider.x+vector[0]*step,divider.y+vector[1]*step)});
+      syncWorldBounds(currentLayout,true);
+      save("Move divider");
+    },
+    openCrew() {
+      closeInspector();
+      endEdit();
+      mode = "inspect";
+      selectedDigger = null;
+      crewOpen = true;
+      publish();
+    },
+    closeCrew() {
+      crewEditing = false;
+      crewOpen = false;
+      publish();
+      cacheSprites();
+    },
+    setCrewEditing(editing) { crewEditing = editing; },
+    setPlacementLimit(value) {
+      const next = setPlacementLimit(state, value);
+      if (placementLimit(state) === value) return true;
+      endEdit();
+      state = next;
+      render();
+      save("Change crew placement limit");
+      notify(`Each digger now has ${value} placement ${value === 1 ? "slot" : "slots"}.`);
+      return true;
+    },
+    saveCrewMember(id, values) {
+      state = saveCrewMember(state, id, values);
+      render();
+      save(id ? "Edit digger" : "Add digger");
+      notify(id ? "Digger updated." : "A new digger has joined the crew.");
+    },
+    archiveCrewMember(id, archived) {
+      state = archiveCrewMember(state, id, archived);
+      render();
+      save(archived ? "Archive digger" : "Restore digger");
+      notify(archived ? "Digger archived and removed from work sites." : "Digger restored. Ready for a new dig.");
+    },
+    openShare() {
+      closeInspector();
+      shareOpen = true;
+      publish();
+    },
+    closeShare() {
+      shareOpen = false;
+      publish();
+    },
+    createSharedProject() {
+      return syncHandlers.create?.();
+    },
+    copyInvite() {
+      return syncHandlers.copy?.();
+    },
+    resolveShared(keepLocal) {
+      return syncHandlers.resolve?.(keepLocal);
+    },
+
     undo: () => travelHistory("undo"),
     redo: () => travelHistory("redo"),
     beginEdit() {
@@ -926,8 +1332,42 @@ export function createProjectController(commit) {
     endEdit,
 
     openNew,
+    openNextBlock() { openNew(nextBlockTarget(state, lastCreatedId)); },
+    navigateToTarget,
+    navigateToBlock,
+    openGoTo() {
+      closeInspector();
+      selectedDigger = null;
+      pendingLink = null;
+      goToOpen = true;
+      publish();
+    },
+    closeGoTo(restoreFocus = false) {
+      goToOpen = false;
+      publish();
+      if (restoreFocus) blockElement(getBlock(state.selected))?.focus({ preventScroll: true });
+    },
+    goToBlock(number) {
+      if (mode !== "inspect" || drag || canvasPanning?.active) return false;
+      const block = blockByNumber(state, number);
+      if (!block) return false;
+      goToOpen = false;
+      return navigateToBlock(block.id, { fit: true });
+    },
+    addBelow(id) {
+      const block = getBlock(id);
+      if (block && !block.done) openNew(belowBlockTarget(block));
+    },
     closeInspector,
     changeProgress,
+    setBlocked(b, blocked) {
+      if (!setBlockBlocked(getBlock(b.id), blocked)) return;
+      selectedDigger = null;
+      endEdit();
+      render();
+      save(blocked ? "Block work site" : "Unblock work site");
+      notify(blocked ? "Barrier up. Diggers are free for other work." : "Barrier down. You can assign diggers again.");
+    },
     assignPerson,
     addDependency,
     toggleCrew() {
@@ -937,6 +1377,7 @@ export function createProjectController(commit) {
     editBlock() {
       mode = "edit";
       renderInspector();
+      $("#block-title")?.focus({ preventScroll: true });
     },
     cancelForm() {
       const creating = mode === "new";
@@ -956,6 +1397,14 @@ export function createProjectController(commit) {
       renderBoard();
       save("Adjust unknown scope");
     },
+    setBlockColor(b, color) {
+      colorPreference.remember(color);
+      if (!Object.hasOwn(PALETTE, color) || b.color === color) return;
+      b.color = color;
+      renderBoard();
+      save("Change block color");
+    },
+    rememberBlockColor(color) { colorPreference.remember(color); },
     setSize(b, size) {
       b.size = size;
       delete b.width;
@@ -1010,9 +1459,11 @@ export function createProjectController(commit) {
           people: [],
           dependency: "",
           done: false,
+          ...creationPlacement(newBlockTarget),
         };
-        state.blocks.push(block);
+        state.blocks = insertCreatedBlock(state, block, newBlockTarget);
         state.selected = block.id;
+        lastCreatedId = block.id;
       }
       mode = "inspect";
       render();
@@ -1022,8 +1473,8 @@ export function createProjectController(commit) {
           ? "The shape of the work is a little clearer."
           : "A new block, ready to explore.",
       );
-      revealSelected();
       closeInspector(true);
+      navigateToBlock(state.selected, { select: false });
     },
     deleteBlock(id) {
       state.blocks = state.blocks.filter((b) => b.id !== id);
@@ -1067,6 +1518,7 @@ export function createProjectController(commit) {
       notify("Fresh ground. The demo is reset.");
     },
   };
+  guardProjectEdits(actions, () => canEdit, requireSignIn);
   let lastSpriteTime = -1;
   function animate(time) {
     panWhileDragging(time);
@@ -1074,12 +1526,18 @@ export function createProjectController(commit) {
       drawDependencies();
     if (time - lastSpriteTime >= 70) {
       workers.paint(time);
+      drawDiscoveries(time);
       lastSpriteTime = time;
     }
     requestFrame(animate);
   }
   let resizeObserver;
   function start() {
+    disposeCanvasZoom = installCanvasZoom($("#pit-viewport"), {
+      getZoom: () => zoom,
+      setZoom,
+      canZoom: () => !drag && !canvasPanning?.active && !canvasPanning?.ready && !projectDetailsOpen,
+    });
     canvasPanning = installCanvasPanning($("#pit-viewport"), {
       canStart: () => !drag,
       onEnd: () => {
@@ -1110,18 +1568,6 @@ export function createProjectController(commit) {
             },
             true,
           );
-        if (
-          dy < 0 &&
-          view.scrollTop - dy + view.clientHeight > view.scrollHeight - 128
-        )
-          syncWorldBounds(
-            {
-              left: WORLD.left,
-              right: WORLD.right,
-              height: WORLD.height + Math.max(320, Math.ceil(-dy / zoom)),
-            },
-            true,
-          );
         view.scrollLeft -= dx;
         view.scrollTop -= dy;
         scheduleTerrain();
@@ -1144,6 +1590,8 @@ export function createProjectController(commit) {
       listen($("#pit-viewport"), event, scheduleEmphasis);
     listen(window, "resize", positionInspector);
     listen(window, "blur", endEdit);
+    listen(window, "blur", () => {if (drag?.kind === "divider") finishDrag({pointerId:drag.pointerId},true);});
+    listen($("#pit-viewport"), "lostpointercapture", (event) => {if (drag?.kind === "divider") finishDrag(event,true);});
     listen($("#inspector-popup"), "toggle", (event) => {
       if (event.newState === "closed" && mode !== "inspect") {
         mode = "inspect";
@@ -1157,20 +1605,7 @@ export function createProjectController(commit) {
       $("#pit-viewport"),
       "scroll",
       () => {
-        const view = $("#pit-viewport");
         requestFrame(positionInspector);
-        if (
-          view.scrollTop > 0 &&
-          view.scrollTop + view.clientHeight > view.scrollHeight - 128
-        )
-          syncWorldBounds(
-            {
-              left: WORLD.left,
-              right: WORLD.right,
-              height: WORLD.height + 480,
-            },
-            true,
-          );
         scheduleTerrain();
       },
       { passive: true },
@@ -1179,11 +1614,6 @@ export function createProjectController(commit) {
     save();
     fit();
     requestFrame(animate);
-    const brand = $(".brand-pick").getContext("2d");
-    pixelLine(brand, 6, 28, 23, 6, "#68794b", 4);
-    pixelLine(brand, 7, 4, 27, 12, "#344d34", 4);
-    pixelLine(brand, 11, 2, 19, 2, "#344d34", 4);
-    pixelLine(brand, 27, 12, 27, 16, "#344d34", 4);
     let previousWidth = $("#pit-viewport").clientWidth;
     resizeObserver = new ResizeObserver((entries) => {
       const width = entries[0].contentRect.width;
@@ -1206,6 +1636,7 @@ export function createProjectController(commit) {
       );
     disposed = true;
     canvasPanning?.dispose();
+    disposeCanvasZoom?.();
     resizeObserver?.disconnect();
     workers.dispose();
     listeners.forEach((remove) => remove());
@@ -1219,7 +1650,7 @@ export function createProjectController(commit) {
   }
   function receiveRemote(snapshot) {
     // Never replace nodes underneath an active gesture or an unsaved text form.
-    if (drag || mode !== "inspect" || editGroup)
+    if (drag || mode !== "inspect" || editGroup || crewEditing || dividerEditor || projectDetailsOpen)
       return { applied: false, deferred: true };
     const result = store.receive(snapshot);
     if (result.applied) {
@@ -1232,5 +1663,32 @@ export function createProjectController(commit) {
     }
     return result;
   }
-  return { getView, actions, start, dispose, store, receiveRemote };
+  return {
+    getView,
+    actions,
+    start,
+    dispose,
+    store,
+    receiveRemote,
+    setSyncHandlers(handlers) {
+      syncHandlers = handlers;
+    },
+    setSyncState(update) {
+      sync = { ...sync, ...update };
+      publish();
+    },
+    setPresenceState(update) {
+      presence = update;
+      publish();
+    },
+    subscribeView(listener) {
+      viewListeners.add(listener);
+      return () => viewListeners.delete(listener);
+    },
+    applyResolvedProject(project) {
+      state = project;
+      if (!getBlock(state.selected)) closeInspector();
+      render();
+    },
+  };
 }

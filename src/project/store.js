@@ -7,8 +7,9 @@ import {
   applyChanges,
 } from "./changes.js";
 import { createProjectHistory } from "./history.js";
+import { applySharedChanges, sharedChanges } from "../sync/changes.js";
 
-// Persistence and collaboration boundary. A future Electric integration feeds
+// Persistence and collaboration boundary. Project rooms feed
 // confirmed snapshots here and submits pending commands through a write API.
 // Local-only mode does not accumulate an unbounded queue of unsendable writes.
 export function createProjectStore({
@@ -16,12 +17,14 @@ export function createProjectStore({
   key = STORAGE,
   initial = demo,
   id = () => crypto.randomUUID(),
+  canEdit = () => true,
+  preferInitial = false,
 } = {}) {
   let project,
     metadata,
     storageAvailable = true;
   try {
-    const saved = JSON.parse(storage?.getItem(key) ?? "null");
+    const saved = preferInitial ? null : JSON.parse(storage?.getItem(key) ?? "null");
     if (validProject(saved)) {
       project = saved;
       metadata = saved._sync;
@@ -81,9 +84,9 @@ export function createProjectStore({
       baseRevision: revision,
       kind,
       label,
-      changes: structuredClone(changes),
+      changes: structuredClone(sharedChanges(changes)),
     };
-    if (syncEnabled) pending.push(mutation);
+    if (syncEnabled && mutation.changes.length) pending.push(mutation);
     return mutation;
   }
   function commit(next, { label = "Edit project", group = null } = {}) {
@@ -94,6 +97,7 @@ export function createProjectStore({
       persist(next.selected);
       return false;
     }
+    if (!canEdit()) throw new Error("Sign in to make changes to this project.");
     if (!validate(after))
       throw new Error("The edit would make an invalid project.");
     history.record(before, after, label, group);
@@ -104,6 +108,7 @@ export function createProjectStore({
     return true;
   }
   function travel(kind) {
+    if (!canEdit()) return null;
     const result = history[kind](document);
     if (!result) return null;
     document = result.document;
@@ -126,7 +131,7 @@ export function createProjectStore({
     if (
       incomingId !== projectId ||
       !Number.isSafeInteger(incomingRevision) ||
-      incomingRevision <= revision
+      incomingRevision < revision
     )
       return { applied: false };
     const candidate = structuredClone(incoming);
@@ -143,10 +148,13 @@ export function createProjectStore({
     // Rebase atomically. Never drop durable edits or partially apply a command
     // when the server and this client have changed the same field.
     for (const command of remaining) {
-      const result = applyChanges(next, command.changes);
+      const result = applySharedChanges(next, command.changes);
       if (result.skipped.length || !validate(result.document))
         return { applied: false, conflict: command.id };
       next = result.document;
+      const packed = materializeProject(next);
+      applyMasonry(packed);
+      next = projectDocument(packed);
     }
     if (!validate(next)) throw new Error("Invalid merged project.");
     document = next;
@@ -167,6 +175,68 @@ export function createProjectStore({
     receive,
     endGroup: () => history.endGroup(),
     getProject: () => materializeProject(document, project.selected),
+    resolveRemote(snapshot, keepLocal) {
+      if (!canEdit()) throw new Error("Sign in to resolve project changes.");
+      if (snapshot.projectId !== projectId || snapshot.revision < revision)
+        throw new Error("The shared snapshot is stale.");
+      const shared = structuredClone(snapshot.project);
+      if (!validProject(shared)) throw new Error("Invalid shared project.");
+      applyMasonry(shared);
+      const base = projectDocument(shared);
+      let desired = structuredClone(base);
+      if (keepLocal) {
+        for (const command of pending.filter(
+          (c) => !snapshot.acknowledgedIds?.includes(c.id),
+        )) {
+          const changes = sharedChanges(command.changes).map((change) => {
+            let parent = desired;
+            for (const key of change.path.slice(0, -1))
+              parent =
+                parent && Object.hasOwn(parent, key) ? parent[key] : null;
+            if (!parent)
+              throw new Error(
+                "Some work was removed. Keep the shared version or save your local copy before continuing.",
+              );
+            const key = change.path.at(-1);
+            return {
+              ...change,
+              before: Object.hasOwn(parent, key)
+                ? { value: structuredClone(parent[key]) }
+                : null,
+            };
+          });
+          desired = applyChanges(desired, changes).document;
+        }
+        if (!validate(desired))
+          throw new Error(
+            "Your pending edits conflict with shared prerequisites or assignments.",
+          );
+        const normalized = materializeProject(desired);
+        applyMasonry(normalized);
+        desired = projectDocument(normalized);
+      }
+      // Keep the pre-resolution project and durable queue before replacing either.
+      storage.setItem(
+        `${key}:conflict-backup`,
+        JSON.stringify({
+          project: materializeProject(document, project.selected),
+          pending,
+        }),
+      );
+      document = desired;
+      revision = snapshot.revision;
+      pending = [];
+      history.clear();
+      const changes = diffDocuments(base, desired);
+      let mutation = null;
+      if (changes.length) {
+        history.record(base, desired, "Resolve shared edits");
+        mutation = enqueue(changes, "Resolve shared edits", "resolve");
+      }
+      persist(project.selected);
+      emit({ source: "resolve", mutation });
+      return materializeProject(document, project.selected);
+    },
     getStatus: () => ({
       storageAvailable,
       syncEnabled,

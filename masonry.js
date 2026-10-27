@@ -1,6 +1,7 @@
 // The excavation has a shared geological grid. Completed footprints are permanent
 // obstacles to packing: rearranging work must never silently refill a hole.
-export const MASONRY = Object.freeze({ left: 48, surface: 96, top: 144, columns: 12, columnWidth: 64, unit: 8, headroom: 48, joint: 0 });
+import { DIGGER } from "./digger-geometry.js";
+export const MASONRY = Object.freeze({ left: 48, surface: 96, top: 144, columns: 12, columnWidth: 64, unit: 8, headroom: DIGGER.height, joint: 0 });
 export const SIZES = Object.freeze({ small: [210, 132], medium: [250, 148], large: [300, 172] });
 export const RESIZE_LIMITS = Object.freeze({ minWidth: 176, maxWidth: 640, minHeight: 132, maxHeight: 640 });
 export function blockDimensions(block) {
@@ -50,7 +51,7 @@ export function layoutMasonry(blocks, excavations = []) {
   const occupied = excavations.map(rect => ({ ...rect }));
   const placements = new Map();
   for (const block of dependencyOrder(blocks.filter(block => !block.done))) {
-    const minimumY=Math.max(MASONRY.top,...dependenciesOf(block).map(id=>{
+    const minimumY=Math.max(MASONRY.top,block.pinnedY ?? MASONRY.top,...dependenciesOf(block).map(id=>{
       const parent=placements.get(id)?.slot??excavations.find(h=>h.blockId===id);
       return parent?parent.y+parent.height:MASONRY.top;
     }));
@@ -92,7 +93,7 @@ export function surfaceAccess(placements,surfaces=placements){
         return [...(left>r.x?[{x:r.x,width:left-r.x}]:[]),...(right<end?[{x:right,width:end-right}]:[])];
       });
     }
-    access.set(id,{ranges,blockedBy,reachable:ranges.some(r=>r.width>=32)});
+    access.set(id,{ranges,blockedBy,reachable:ranges.some(r=>r.width>=DIGGER.width)});
   }
   return access;
 }
@@ -154,6 +155,7 @@ export function previewMove(project, id, x, y) {
     if (distance < closest) { closest = distance; index = i + (y + shape.height / 2 > slot.y + slot.height / 2 ? 1 : 0); }
   });
   const next = { ...moving, pinnedX, pinnedColumn: column, column };
+  delete next.pinnedY;
   const liveOrder = [...live.slice(0, index), next, ...live.slice(index)];
   const blocks = [...liveOrder, ...others.filter(block => block.done)];
   return { blocks, ...layoutMasonry(blocks, project.excavations) };
@@ -167,10 +169,46 @@ export function previewResize(project, id, edge, dx, dy) {
     ? clamp(oldWidth + (edge.includes('w') ? -dx : dx), RESIZE_LIMITS.minWidth, RESIZE_LIMITS.maxWidth) : oldWidth;
   const height = /[ns]/.test(edge) && dy !== 0
     ? clamp(oldHeight + (edge.includes('n') ? -dy : dy), RESIZE_LIMITS.minHeight, RESIZE_LIMITS.maxHeight) : oldHeight;
+  return resizedLayout(project, block, edge, width, height);
+}
+function resizedLayout(project, block, edge, width, height) {
+  const [oldWidth] = blockDimensions(block);
   // West handles keep the right body edge fixed. Vertical placement remains
   // constrained by collisions and the dependency floor.
   const pinnedX=block.x+(edge.includes('w')?oldWidth-width:0);
   const next = { ...block, width, height, pinnedX, pinnedColumn: Math.round((pinnedX-MASONRY.left)/MASONRY.columnWidth) };
-  const blocks = project.blocks.map(b => b.id === id ? next : b);
+  const blocks = project.blocks.map(b => b.id === block.id ? next : b);
   return { blocks, ...layoutMasonry(blocks, project.excavations) };
+}
+
+// A quick alignment grows into empty ground; it never shrinks a block or moves
+// it to another course merely to reach an edge. Ordinary drag resizing may reflow.
+export function previewGrowToEdge(project, id, edge) {
+  if (edge !== 'w' && edge !== 'e') return { ok: false, reason: 'Choose a left or right resize handle.' };
+  const baseline = structuredClone(project);
+  const layout = applyMasonry(baseline);
+  const block = baseline.blocks.find(b => b.id === id);
+  const body = layout.placements.get(id)?.slot;
+  if (!block || !body) return { ok: false, reason: 'Choose a block that is still in the ground.' };
+  const currentEdge = edge === 'w' ? body.x : body.x + body.width;
+  const candidates = [];
+  for (const [otherId, { slot }] of layout.placements) {
+    if (otherId === id || (slot.y + slot.height > body.y && slot.y < body.y + body.height)) continue;
+    const gap = Math.max(body.y - slot.y - slot.height, slot.y - body.y - body.height);
+    for (const x of [slot.x, slot.x + slot.width]) {
+      const growth = edge === 'w' ? currentEdge - x : x - currentEdge;
+      if (growth > 1e-6) candidates.push({ x, growth, gap, id: otherId });
+    }
+  }
+  candidates.sort((a, b) => a.growth - b.growth || a.gap - b.gap || a.id.localeCompare(b.id));
+  const target = candidates[0];
+  if (!target) return { ok: false, reason: 'No block edge farther out on this side.' };
+  const width = body.width + target.growth;
+  if (width > RESIZE_LIMITS.maxWidth) return { ok: false, reason: 'That edge is beyond the maximum block width.' };
+  const grown = { ...body, x: edge === 'w' ? target.x : body.x, width };
+  const obstacles = [...layout.placements].filter(([otherId]) => otherId !== id).map(([, p]) => p.slot);
+  if ([...obstacles, ...baseline.excavations].some(rect => intersects(grown, rect)))
+    return { ok: false, reason: 'Another block or excavated space blocks that edge.' };
+  const preview = resizedLayout(baseline, block, edge, width, body.height);
+  return { ok: true, targetId: target.id, targetX: target.x, ...preview };
 }

@@ -1,34 +1,27 @@
 import { Icon } from "./Icon.jsx";
+import { DIVIDER_COLORS, DIVIDER_LIMIT } from "../project/dividers.js";
+import { ClearedMenu } from "./ClearedMenu.jsx";
+import { ProjectTitle } from "./ProjectTitle.jsx";
 
 export function Toolbar({ view, actions }) {
-  const done = view.state.blocks.filter((b) => b.done);
   return (
     <div className="dig-toolbar">
       <div className="excavation-tools">
-        <h2>The next release</h2>
+        <h1 className="board-project-title"><ProjectTitle project={view.state} canEdit={view.canEdit} actions={actions} /></h1>
+        {!view.isShared && <span className="demo-label">DEMO PROJECT</span>}
         <span className="project-presence">
           <span className="status-dot" />
           <span id="active-count">{view.activeCount}</span> at work
         </span>
-        <details className="cleared-menu">
-          <summary>
-            Cleared <span id="cleared-count">{done.length}</span>
-          </summary>
-          <div id="cleared-list">
-            {done.length ? (
-              done.map((b) => (
-                <button
-                  key={b.id}
-                  className="cleared-entry"
-                  data-cleared={b.id}
-                >
-                  <Icon name="check" />
-                  <span>{b.title}</span>
-                </button>
-              ))
-            ) : (
-              <p className="cleared-empty">The first breakthrough is ahead.</p>
-            )}
+        <ClearedMenu view={view} actions={actions} />
+        <details className="dividers-menu">
+          <summary><Icon name="divider" /><span>Phases</span><span className="phase-count">{view.state.dividers?.length || ""}</span></summary>
+          <div className="dividers-list">
+            <p>Rough boundaries, no deadlines.</p>
+            {(view.state.dividers ?? []).slice().sort((a,b) => a.y-b.y).map((divider) => <button key={divider.id} type="button" className="divider-entry" disabled={!view.canEdit} onClick={(event) => actions.openDivider(divider.id,event.currentTarget)}>
+              <i style={{background:DIVIDER_COLORS[divider.color].ink}} /><span>{divider.label}</span><Icon name="edit" />
+            </button>)}
+            <button id="new-divider" type="button" className="divider-add" disabled={!view.canEdit || (view.state.dividers?.length ?? 0)>=DIVIDER_LIMIT} onClick={actions.openNewDivider}><Icon name="plus" />Add a divider</button>
           </div>
         </details>
       </div>
@@ -42,7 +35,7 @@ export function Toolbar({ view, actions }) {
               ? `Undo: ${view.history.undoLabel} (⌘/Ctrl+Z)`
               : "Undo (⌘/Ctrl+Z)"
           }
-          disabled={!view.history.canUndo || view.mode !== "inspect"}
+          disabled={!view.canEdit || !view.history.canUndo || view.mode !== "inspect" || Boolean(view.dividerEditor)}
           onClick={actions.undo}
         >
           <Icon name="undo" />
@@ -56,10 +49,13 @@ export function Toolbar({ view, actions }) {
               ? `Redo: ${view.history.redoLabel} (⌘/Ctrl+Y)`
               : "Redo (⌘/Ctrl+Y or ⇧⌘/Ctrl+Z)"
           }
-          disabled={!view.history.canRedo || view.mode !== "inspect"}
+          disabled={!view.canEdit || !view.history.canRedo || view.mode !== "inspect" || Boolean(view.dividerEditor)}
           onClick={actions.redo}
         >
           <Icon name="redo" />
+        </button>
+        <button id="new-block" className="button primary toolbar-add" aria-label="Add a block" disabled={!view.canEdit} title={view.canEdit ? "Add a block" : "Sign in to add blocks"} onClick={actions.openNew}>
+          <Icon name="plus" />Add block
         </button>
         <span className="toolbar-divider" />
         <button
@@ -71,7 +67,7 @@ export function Toolbar({ view, actions }) {
         >
           <Icon name="minus" />
         </button>
-        <output id="zoom-level">{Math.round(view.zoom * 100)}%</output>
+        <output id="zoom-level" title="Hold ⌘ or Ctrl and scroll over the excavation to zoom">{Math.round(view.zoom * 100)}%</output>
         <button
           className="icon-button"
           id="zoom-in"

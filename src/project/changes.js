@@ -1,3 +1,5 @@
+import { DEFAULT_CREW, crewOf } from "./crew.js";
+
 // Shared project data has entity IDs and field-level changes. Selection, camera,
 // popup state, and character timelines belong to each client, never to a write.
 export const equal = (a, b) => {
@@ -18,7 +20,13 @@ const cell = (object, key) =>
 export function projectDocument(project) {
   return {
     version: project.version,
+    ...(project.name !== undefined ? { name: project.name } : {}),
+    ...(project.subtitle !== undefined ? { subtitle: project.subtitle } : {}),
+    ...(project.maxPlacements !== undefined ? { maxPlacements: project.maxPlacements } : {}),
     layoutVersion: project.layoutVersion,
+    colorLegend: copy(project.colorLegend ?? {}),
+    crew: Object.fromEntries(crewOf(project).map((person) => [person.id, copy(person)])),
+    dividers: Object.fromEntries((project.dividers ?? []).map((divider) => [divider.id, copy(divider)])),
     order: project.blocks.map((block) => block.id),
     blocks: Object.fromEntries(
       project.blocks.map((block) => [block.id, copy(block)]),
@@ -39,8 +47,14 @@ export function materializeProject(document, selected = null) {
   ];
   return {
     version: document.version,
+    ...(document.name !== undefined ? { name: document.name } : {}),
+    ...(document.subtitle !== undefined ? { subtitle: document.subtitle } : {}),
+    ...(document.maxPlacements !== undefined ? { maxPlacements: document.maxPlacements } : {}),
     layoutVersion: document.layoutVersion,
+    colorLegend: copy(document.colorLegend ?? {}),
     selected,
+    crew: document.crew ? Object.values(document.crew).map(copy) : copy(DEFAULT_CREW),
+    dividers: Object.values(document.dividers ?? {}).map(copy),
     blocks: order
       .filter((id) => Object.hasOwn(document.blocks, id))
       .map((id) => copy(document.blocks[id])),
@@ -58,11 +72,11 @@ export function diffDocuments(before, after) {
         after: cell(b, key),
       });
   }
-  for (const key of ["version", "layoutVersion", "order"])
+  for (const key of ["version", "layoutVersion", "name", "subtitle", "maxPlacements", "order"])
     field(before, after, key, []);
-  for (const collection of ["blocks", "excavations"]) {
-    const a = before[collection],
-      b = after[collection];
+  for (const collection of ["blocks", "excavations", "crew", "dividers", "colorLegend"]) {
+    const a = before[collection] ?? {},
+      b = after[collection] ?? {};
     for (const id of new Set([...Object.keys(a), ...Object.keys(b)])) {
       if (!Object.hasOwn(a, id) || !Object.hasOwn(b, id))
         field(a, b, id, [collection]);

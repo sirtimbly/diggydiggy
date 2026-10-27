@@ -40,6 +40,11 @@ export function createProjectHistory({
   }
   return {
     record,
+    clear() {
+      past.length = 0;
+      future.length = 0;
+      group = null;
+    },
     undo: (document) => travel(document, past, future),
     redo: (document) => travel(document, future, past),
     endGroup() {

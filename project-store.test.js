@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createProjectStore } from "./src/project/store.js";
-import { demo, STORAGE } from "./src/project/project.js";
+import { demo, emptyProject, STORAGE } from "./src/project/project.js";
 import {
   projectDocument,
   materializeProject,
@@ -9,6 +9,7 @@ import {
   applyChanges,
 } from "./src/project/changes.js";
 import { historyShortcut } from "./src/project/shortcuts.js";
+import { applyCommand } from "./src/sync/protocol.js";
 
 function setup(saved = null) {
   const values = new Map(saved ? [[STORAGE, JSON.stringify(saved)]] : []);
@@ -27,8 +28,65 @@ function edit(store, fn, options) {
   store.commit(p, options);
   return p;
 }
+
+test("authoritative local SQL startup ignores a stale browser recovery cache", () => {
+  const cached = { ...emptyProject(), name: "Old browser copy" };
+  const database = { ...emptyProject(), name: "Current database" };
+  const storage = { getItem: () => JSON.stringify(cached), setItem() {} };
+  const store = createProjectStore({ storage, initial: () => database, preferInitial: true });
+  assert.equal(store.getProject().name, "Current database");
+  assert.equal(store.getStatus().syncEnabled, false);
+});
+
+test("an acknowledgement at the current revision clears an already-applied outbox command", () => {
+  const { store } = setup();
+  store.enableSync({ projectId: "shared", revision: 1 });
+  edit(store, (p) => { p.name = "Already accepted"; });
+  const pending = store.getPendingMutations()[0], project = store.getProject();
+  assert.equal(store.receive({ projectId: "shared", revision: 2, project, acknowledgedIds: [] }).applied, true);
+  assert.equal(store.getStatus().pendingCount, 1);
+  assert.equal(store.receive({ projectId: "shared", revision: 2, project, acknowledgedIds: [pending.id] }).applied, true);
+  assert.equal(store.getStatus().pendingCount, 0);
+});
 const block = (store, id = "b1") =>
   store.getProject().blocks.find((b) => b.id === id);
+
+test("legacy project names persist, sync as one field, and support selective undo", () => {
+  const legacy = demo();
+  delete legacy.name;
+  const { store, create } = setup(legacy);
+  assert.equal(Object.hasOwn(store.getProject(), "name"), false);
+  const baseline = store.getProject();
+  edit(store, (p) => { p.name = "Our launch"; }, { label: "Rename project" });
+  const changes = diffDocuments(projectDocument(baseline), projectDocument(store.getProject()));
+  assert.deepEqual(changes, [{ path: ["name"], before: null, after: { value: "Our launch" } }]);
+  assert.equal(create().getProject().name, "Our launch");
+  const command = { version: 1, id: "rename", clientId: "tab", projectId: "room", baseRevision: 1, kind: "edit", label: "Rename project", changes };
+  const remote = applyCommand(projectDocument(baseline), command, "room");
+  assert.equal(materializeProject(remote).name, "Our launch");
+  assert.deepEqual(materializeProject(remote).blocks, baseline.blocks);
+  store.undo();
+  assert.equal(Object.hasOwn(store.getProject(), "name"), false);
+  store.redo();
+  assert.equal(store.getProject().name, "Our launch");
+  for (const name of ["", "  ", "x".repeat(81), 42]) {
+    assert.throws(() => applyCommand(projectDocument(baseline), { ...command, changes: [{ path: ["name"], before: null, after: { value: name } }] }, "room"), /Invalid project/);
+  }
+});
+
+test("a new blank project's cache preserves the original draft and keeps an empty crew on reload", () => {
+  const { store: original, storage } = setup();
+  edit(original, (p) => { p.blocks[0].title = "Keep my existing project"; });
+  const draft = storage.getItem(STORAGE);
+  const key = `${STORAGE}:new-blank-project`;
+  const blank = createProjectStore({ storage, key, initial: emptyProject });
+  blank.commit(blank.getProject());
+  const reloaded = createProjectStore({ storage, key });
+  for (const collection of ["blocks", "crew", "dividers", "excavations"])
+    assert.deepEqual(reloaded.getProject()[collection], []);
+  assert.equal(storage.getItem(STORAGE), draft);
+  assert.equal(createProjectStore({ storage }).getProject().blocks[0].title, "Keep my existing project");
+});
 
 test("selection, no-ops, and initial layout do not enter history; edits undo and redo", () => {
   const { store } = setup();
@@ -380,4 +438,67 @@ test("outbox consumers cannot mutate queued payloads through events or returned 
   assert.ok(commands[0].changes.length);
   commands[0].changes.length = 0;
   assert.ok(store.getPendingMutations()[0].changes.length);
+});
+
+test("conflict resolution keeps a backup, preserves independent shared fields, and queues a fresh command", () => {
+  const { store, storage } = setup();
+  store.enableSync({ projectId: "shared", revision: 1 });
+  const shared = store.getProject();
+  edit(store, (p) => (p.blocks.find((b) => b.id === "b1").title = "My draft"));
+  shared.blocks.find((b) => b.id === "b1").title = "Their draft";
+  shared.blocks.find((b) => b.id === "b1").note = "Shared context";
+  const snapshot = {
+    projectId: "shared",
+    revision: 2,
+    project: shared,
+    acknowledgedIds: [],
+  };
+  assert.ok(store.receive(snapshot).conflict);
+  store.resolveRemote(snapshot, true);
+  assert.equal(block(store).title, "My draft");
+  assert.equal(block(store).note, "Shared context");
+  assert.equal(store.getPendingMutations().length, 1);
+  assert.equal(store.getPendingMutations()[0].kind, "resolve");
+  assert.equal(
+    JSON.parse(
+      storage.getItem(`${STORAGE}:conflict-backup`),
+    ).project.blocks.find((b) => b.id === "b1").title,
+    "My draft",
+  );
+  store.undo();
+  assert.equal(block(store).title, "Their draft");
+});
+
+test("choosing shared edits clears pending writes only after saving the local backup", () => {
+  const { store, storage } = setup();
+  store.enableSync({ projectId: "shared", revision: 1 });
+  const shared = store.getProject();
+  edit(store, (p) => (p.blocks[0].title = "Offline edit"));
+  store.resolveRemote(
+    { projectId: "shared", revision: 2, project: shared, acknowledgedIds: [] },
+    false,
+  );
+  assert.equal(store.getPendingMutations().length, 0);
+  assert.deepEqual(store.getProject().blocks, shared.blocks);
+  assert.ok(storage.getItem(`${STORAGE}:conflict-backup`));
+});
+
+test("project name and sign subtitle save atomically across legacy rooms, reload, sync, and undo", () => {
+  const {store,create}=setup();
+  const before=store.getProject(), after=structuredClone(before);
+  after.name='The autumn dig'; after.subtitle='One ledge at a time';
+  store.commit(after,{label:'Edit project details'});
+  assert.equal(create().getProject().subtitle,'One ledge at a time');
+  const command={version:1,id:'details',clientId:'tab',projectId:'room',baseRevision:1,kind:'edit',label:'Edit project details',changes:diffDocuments(projectDocument(before),projectDocument(after))};
+  const synced=materializeProject(applyCommand(projectDocument(before),command,'room'));
+  assert.equal(synced.name,'The autumn dig');assert.equal(synced.subtitle,'One ledge at a time');
+  assert.deepEqual(synced.blocks,before.blocks);
+  store.undo(); assert.equal(store.getProject().name,before.name);assert.equal(store.getProject().subtitle,undefined);
+  store.redo(); assert.equal(store.getProject().subtitle,'One ledge at a time');
+  const cleared=structuredClone(after);cleared.subtitle='';
+  assert.doesNotThrow(()=>applyCommand(projectDocument(after),{...command,id:'clear-subtitle',changes:diffDocuments(projectDocument(after),projectDocument(cleared))},'room'));
+  for(const subtitle of ['x'.repeat(81),42,null]) {
+    const invalid=structuredClone(after);invalid.subtitle=subtitle;
+    assert.throws(()=>applyCommand(projectDocument(before),{...command,changes:diffDocuments(projectDocument(before),projectDocument(invalid))},'room'),/Invalid project/);
+  }
 });

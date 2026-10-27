@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Icon } from "./Icon.jsx";
 
-export function HelpDialog({ actions }) {
+export function HelpDialog({ actions, canEdit }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <dialog id="help-dialog">
@@ -18,6 +18,11 @@ export function HelpDialog({ actions }) {
         </p>
         <ul>
           <li>
+            <strong>Keep your hands on the keyboard.</strong> Press N while viewing the canvas to add below the last block you created (or the selected block).
+            New and edit forms focus the title right away. Press G, then type a block’s number to jump to it; Enter goes immediately and Escape cancels.
+            Completed blocks are revealed on your canvas and stay completed. Shortcuts leave typing in fields alone.
+          </li>
+          <li>
             <strong>Change your mind.</strong> Use ⌘/Ctrl+Z to undo and ⌘/Ctrl+Y
             or Shift+⌘/Ctrl+Z to redo a project edit. The toolbar arrows do the
             same. A drag or uncertainty gesture is one edit. Text fields keep
@@ -29,7 +34,8 @@ export function HelpDialog({ actions }) {
             and drag, or hold Space and drag with the left button, anywhere on
             the excavation. Release to return to moving blocks. You can pan
             across fresh ground sideways and downward, or use the mouse wheel to
-            scroll the excavation. Space works normally while editing text.
+            scroll the excavation. Hold ⌘ or Ctrl while scrolling over the
+            excavation to zoom around the pointer. Space works normally while editing text.
           </li>
           <li>
             <strong>Move the work.</strong> Drag a block to reorder the contact
@@ -53,12 +59,12 @@ export function HelpDialog({ actions }) {
             <strong>Follow the focus.</strong> Use the small Crew palette at the
             top-left of the canvas. Drag a digger onto a block, or select a
             digger and click a block. The minus button collapses the palette.
-            Each person can work in two places. Drag a placed digger to move
+            Manage crew sets the project’s placement limit per person. Green lights show occupied slots; dim lights show available slots. Drag a placed digger to move
             that work site.
           </li>
           <li>
             <strong>Reshape the work.</strong> Drag any edge or corner to resize
-            a block. Focus a handle and use arrow keys to resize with the
+            a block. Double-click a left or right handle to grow to the next edge of a block above or below, or focus that handle and press Enter. Focus a handle and use arrow keys to resize with the
             keyboard; Shift takes bigger steps. The solid stack snaps around the
             new size without adding padding. Click a block to open its compact
             details window. Close it with Escape, the close button, or a click
@@ -78,8 +84,7 @@ export function HelpDialog({ actions }) {
           </li>
         </ul>
         <p className="help-note">
-          This is a local prototype with sample people and tasks. Changes stay
-          in this browser. Shared live collaboration is a future step.
+          Sign in to create projects or make changes. Start with sample people and tasks, then manage your crew from the crew tray. Local projects save in this browser; use Share for live collaboration.
         </p>
         <button className="button primary">Let’s dig</button>
       </form>
@@ -87,6 +92,7 @@ export function HelpDialog({ actions }) {
         <button
           className="text-button"
           id="help-reset"
+          disabled={!canEdit}
           onClick={() => setConfirming(true)}
         >
           Reset demo
@@ -94,12 +100,13 @@ export function HelpDialog({ actions }) {
         {confirming && (
           <div>
             <p className="reset-question">
-              Replace local changes with the demo?
+              Replace the current blocks and crew with the demo?
             </p>
             <div className="reset-row">
               <button
                 className="button"
                 id="confirm-reset"
+                disabled={!canEdit}
                 onClick={() => {
                   actions.resetDemo();
                   setConfirming(false);

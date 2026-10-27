@@ -1,0 +1,24 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "diggy-diggy",
+  "main": "worker/index.ts",
+  "account_id": "a8d34ac4c43d2065eb53587d152760ae",
+  "compatibility_date": "2026-10-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": true,
+  "routes": [{ "pattern": "diggydiggy.app", "custom_domain": true }],
+  "assets": { "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/api/*", "/healthz"] },
+  "durable_objects": { "bindings": [{ "name": "PROJECTS", "class_name": "ProjectRoom" }, { "name": "AUTH_SESSIONS", "class_name": "AuthSession" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ProjectRoom"] }, { "tag": "v2", "new_sqlite_classes": ["AuthSession"] }],
+  "ratelimits": [{ "name": "CREATE_LIMITER", "namespace_id": "1001", "simple": { "limit": 5, "period": 60 } }],
+  "observability": { "enabled": true },
+  "env": {
+    "staging": {
+      "name": "diggy-diggy-staging",
+      "routes": [],
+      "durable_objects": { "bindings": [{ "name": "PROJECTS", "class_name": "ProjectRoom" }, { "name": "AUTH_SESSIONS", "class_name": "AuthSession" }] },
+      "ratelimits": [{ "name": "CREATE_LIMITER", "namespace_id": "1002", "simple": { "limit": 5, "period": 60 } }]
+    }
+  }
+}

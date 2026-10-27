@@ -1,11 +1,10 @@
-import { PEOPLE } from "../project/project.js";
 import { createDiggerLife, sampleDigger } from "../../digger-life.js";
 import { hash } from "./random.js";
 import { drawSprite } from "./pixels.js";
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 
-export function createWorkerAnimator({ getDrag, reducedMotion }) {
+export function createWorkerAnimator({ getDrag, getPeople, reducedMotion }) {
   let spriteCache = [];
   const diggerLives = new Map(),
     spriteEntries = new WeakMap(),
@@ -75,7 +74,7 @@ export function createWorkerAnimator({ getDrag, reducedMotion }) {
     spriteCache = $$("canvas[data-person]").map((canvas) => {
       const s = {
         canvas,
-        person: PEOPLE.find((p) => p.id === canvas.dataset.person),
+        person: getPeople().find((p) => p.id === canvas.dataset.person),
         working: canvas.dataset.working === "true",
         baseX: parseFloat(canvas.closest(".block-digger")?.style.left) || 0,
       };
@@ -84,6 +83,7 @@ export function createWorkerAnimator({ getDrag, reducedMotion }) {
       if (s.working) spriteVisibility.observe(canvas);
       return s;
     });
+    spriteCache = spriteCache.filter((s) => s.person);
     spriteCache.forEach((s) => paintWorker(s, now));
   }
 

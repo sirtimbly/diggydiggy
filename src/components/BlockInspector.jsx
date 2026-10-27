@@ -1,12 +1,19 @@
+import { useLayoutEffect, useRef } from "react";
 import { SIZES, dependenciesOf, canAddDependency } from "../../masonry.js";
-import { PEOPLE } from "../project/project.js";
+import { activeCrew } from "../project/crew.js";
 import { Icon, Sprite } from "./Icon.jsx";
 import { BlockForm } from "./BlockForm.jsx";
+import { BlockColorPicker } from "./BlockColorPicker.jsx";
+import { blockNumber } from "../project/project.js";
 
 const uncertaintyName = (value) => `${Math.round((value / 48) * 100)}% unknown`;
 
 export function BlockInspector({ view, actions }) {
   const b = view.getBlock(view.state.selected);
+  const scrollRef = useRef(null);
+  useLayoutEffect(() => {
+    scrollRef.current.scrollTop = 0;
+  }, [view.mode, b?.id]);
   return (
     <section
       id="inspector-popup"
@@ -27,11 +34,13 @@ export function BlockInspector({ view, actions }) {
           <Icon name="close" />
         </button>
       </div>
-      <div id="inspector" className="inspector" aria-label="Selected block">
+      <div ref={scrollRef} id="inspector" className="inspector" aria-label="Selected block">
         {view.mode === "new" || view.mode === "edit" ? (
           <BlockForm
-            key={`${view.mode}:${b?.id ?? ""}`}
+            key={`${view.mode}:${b?.id ?? ""}:${view.newBlockTarget?.x ?? ""}:${view.newBlockTarget?.y ?? ""}`}
             block={view.mode === "edit" ? b : null}
+            initialColor={view.newBlockColor}
+            project={view.state}
             actions={actions}
           />
         ) : b ? (
@@ -45,7 +54,7 @@ export function BlockInspector({ view, actions }) {
               <br />
               progress, and people.
             </p>
-            <button className="button" onClick={actions.openNew}>
+            <button className="button" disabled={!view.canEdit} onClick={actions.openNew}>
               <Icon name="plus" />
               Add a block
             </button>
@@ -59,12 +68,14 @@ export function BlockInspector({ view, actions }) {
 function BlockDetails({ block: b, view, actions }) {
   const blocked = view.isBlocked(b);
   return (
-    <>
+    <fieldset className="block-details-fields" disabled={!view.canEdit}>
       <div className="inspector-header">
         <span>
-          {b.code} /{" "}
+          {blockNumber(b)} /{" "}
           {b.done
             ? "CLEARED"
+            : b.blocked
+              ? "BLOCKED"
             : blocked
               ? "WAITING"
               : b.people.length
@@ -80,8 +91,15 @@ function BlockDetails({ block: b, view, actions }) {
           <Icon name="edit" />
         </button>
       </div>
+      <BlockColorPicker project={view.state} color={b.color} onChange={(color) => actions.setBlockColor(b, color)} />
       <h2>{b.title}</h2>
       <p className="task-note">{b.note}</p>
+      {!b.done && <div className={`blocked-control${b.blocked ? " is-blocked" : ""}`}>
+        <div><label htmlFor="block-blocked">Blocked</label>
+          <p>{b.blocked ? "Unblock to welcome diggers back." : "Pause this site and free its diggers."}</p></div>
+        <input id="block-blocked" type="checkbox" role="switch" checked={Boolean(b.blocked)}
+          onChange={(event) => actions.setBlocked(b, event.currentTarget.checked)} />
+      </div>}
       <section className="inspector-section">
         <div className="field-label">
           <span>A little progress</span>
@@ -200,7 +218,7 @@ function BlockDetails({ block: b, view, actions }) {
         </div>
         {b.people.length ? (
           b.people.map((id) => {
-            const person = PEOPLE.find((p) => p.id === id);
+            const person = view.state.crew.find((p) => p.id === id);
             return (
               <div className="assigned-person" key={id}>
                 <Sprite person={person} />
@@ -218,13 +236,14 @@ function BlockDetails({ block: b, view, actions }) {
           })
         ) : (
           <p className="assignment-empty">
-            {b.done ? "A job well dug." : "A quiet spot. Bring a digger over."}
+            {b.done ? "A job well dug." : b.blocked ? "Diggers are free for other work." : "A quiet spot. Bring a digger over."}
           </p>
         )}
         {!b.done && (
           <select
             className="assign-select"
             id="assign-person"
+            disabled={Boolean(b.blocked)}
             aria-label="Assign a digger"
             value=""
             onChange={(event) =>
@@ -233,7 +252,7 @@ function BlockDetails({ block: b, view, actions }) {
             }
           >
             <option value="">+ Add a digger</option>
-            {PEOPLE.filter((p) => !b.people.includes(p.id)).map((p) => (
+            {activeCrew(view.state).filter((p) => !b.people.includes(p.id)).map((p) => (
               <option key={p.id} value={p.id}>
                 {p.name}
               </option>
@@ -355,6 +374,6 @@ function BlockDetails({ block: b, view, actions }) {
           Move it as your understanding changes.
         </p>
       </div>
-    </>
+    </fieldset>
   );
 }

@@ -3,11 +3,32 @@ import { routeDependency } from "../../dependency-lines.js";
 import { rng, hash } from "./random.js";
 import { pixelLine } from "./pixels.js";
 import { escapeHTML } from "./icons.js";
+import { drawDinosaurFossil, drawPortaPotty, drawDwarf, drawBalrog, clearDiscoveryObstacles, FOSSIL_TOP, DWARF_TOP, BALROG_TOP, BALROG_HEIGHT } from "./terrain-props.js";
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
+export const SURFACE_SIGN_LEFT = 280;
 
 export function createSceneRenderer(context) {
   const getBlock = (id) => context.state.blocks.find((b) => b.id === id);
+  let discoveryPaint = null, discoveryFrame = -1;
+  function drawDiscoveries(time = 0, force = false) {
+    const paint = discoveryPaint;
+    if (!paint || document.hidden) return;
+    const animated = paint.bottom > DWARF_TOP && paint.top < BALROG_TOP + BALROG_HEIGHT;
+    const frame = context.reducedMotion ? 0 : Math.floor(time / 140);
+    if (!force && (!animated || frame === discoveryFrame)) return;
+    discoveryFrame = frame;
+    const canvas = $("#discoveries"), c = canvas.getContext("2d");
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, canvas.width, canvas.height);
+    c.translate(-paint.left, -paint.top);
+    if (paint.bottom > FOSSIL_TOP && paint.top < FOSSIL_TOP + 256) drawDinosaurFossil(c);
+    if (paint.bottom > DWARF_TOP && paint.top < DWARF_TOP + 100) drawDwarf(c, frame * 140);
+    if (paint.bottom > BALROG_TOP && paint.top < BALROG_TOP + BALROG_HEIGHT) drawBalrog(c, frame * 140);
+    const { state, drag, currentLayout } = context;
+    const placements = (drag?.preview ?? currentLayout)?.placements ?? new Map();
+    clearDiscoveryObstacles(c, placements, excavationRects(placements, state.excavations));
+  }
   // Canvas owns terrain pixels and geometric dependency paths; React owns task UI.
   function drawTerrain() {
     const { WORLD, zoom } = context;
@@ -40,6 +61,10 @@ export function createSceneRenderer(context) {
       width,
       height,
     };
+    const discoveries = $("#discoveries");
+    discoveries.width = width; discoveries.height = height;
+    Object.assign(discoveries.style, {left:`${x}px`, top:`${y}px`, width:`${width}px`, height:`${height}px`});
+    discoveryPaint = paint;
     const c = canvas.getContext("2d");
     const random = rng(84);
     c.translate(-paint.left, -paint.top);
@@ -108,22 +133,23 @@ export function createSceneRenderer(context) {
     }
     // A small timber sign, grass tufts, fence, and the forgotten shovel at the surface.
     c.fillStyle = "#514b34";
-    c.fillRect(44, 17, 242, 54);
-    c.fillRect(60, 65, 8, 25);
-    c.fillRect(257, 65, 8, 25);
+    c.fillRect(SURFACE_SIGN_LEFT, 17, 242, 54);
+    c.fillRect(SURFACE_SIGN_LEFT + 16, 65, 8, 25);
+    c.fillRect(SURFACE_SIGN_LEFT + 213, 65, 8, 25);
     c.fillStyle = "#9c9970";
-    c.fillRect(44, 17, 242, 3);
-    c.fillRect(44, 17, 3, 54);
+    c.fillRect(SURFACE_SIGN_LEFT, 17, 242, 3);
+    c.fillRect(SURFACE_SIGN_LEFT, 17, 3, 54);
     c.fillStyle = "#525f3d";
     for (let x = 620; x < 880; x += 58) {
       c.fillRect(x, 58, 6, 31);
     }
     c.fillRect(620, 66, 238, 5);
     c.fillRect(620, 79, 238, 4);
-    pixelLine(c, 420, 47, 438, 83, "#b6a077", 4);
+    pixelLine(c, 580, 47, 598, 83, "#b6a077", 4);
     c.fillStyle = "#a9afa0";
-    c.fillRect(431, 76, 12, 9);
+    c.fillRect(591, 76, 12, 9);
     c.fillRect(435, 84, 8, 4);
+    drawPortaPotty(c);
     for (let i = 0; i < 25; i++) {
       const x = Math.floor(random() * 215) * 4,
         y = Math.floor(random() * 16) * 4;
@@ -151,6 +177,7 @@ export function createSceneRenderer(context) {
       c.globalAlpha = 1;
     }
     drawGeology(c, paint);
+    drawDiscoveries(performance.now(), true);
     drawDependencies();
   }
   function drawDependencies() {
@@ -209,11 +236,14 @@ export function createSceneRenderer(context) {
         )
         .join("") +
       "</defs>";
+    const connectedOutputs = new Set(), connectedInputs = new Set();
     for (const b of state.blocks.filter((b) => !b.done))
       for (const id of dependenciesOf(b)) {
         const a = anchor(id, true),
           end = anchor(b.id, false);
         if (!a || !end) continue;
+        connectedOutputs.add(id);
+        connectedInputs.add(b.id);
         const d = path(a, end, id, b.id),
           active = state.selected === b.id || state.selected === id;
         paths += `<g class="dependency-connection" data-from="${escapeHTML(id)}" data-to="${escapeHTML(b.id)}"><path class="dependency-shadow" d="${d}"/><path class="dependency-line ${active ? "is-active" : ""}" d="${d}" marker-end="url(#dependency-arrow-${active ? "active" : "normal"})" data-from="${escapeHTML(id)}" data-to="${escapeHTML(b.id)}"><title>${escapeHTML(getBlock(id)?.title ?? "Cleared work")} must precede ${escapeHTML(b.title)}</title></path></g>`;
@@ -234,9 +264,12 @@ export function createSceneRenderer(context) {
     }
     root.innerHTML = paths;
     updateDependencyEmphasis();
-    $$(".dependency-port").forEach((p) =>
-      p.classList.toggle("is-link-source", p.dataset.linkOut === pendingLink),
-    );
+    $$(".dependency-port").forEach((p) => {
+      p.classList.toggle("is-link-source", p.dataset.linkOut === pendingLink);
+      p.classList.toggle("is-connected", p.dataset.linkOut
+        ? connectedOutputs.has(p.dataset.linkOut)
+        : connectedInputs.has(p.dataset.linkIn));
+    });
   }
   function updateDependencyEmphasis() {
     const highlighted = new Set(
@@ -298,5 +331,5 @@ export function createSceneRenderer(context) {
     c.restore();
   }
 
-  return { drawTerrain, drawDependencies, updateDependencyEmphasis };
+  return { drawTerrain, drawDependencies, updateDependencyEmphasis, drawDiscoveries };
 }

@@ -1,28 +1,70 @@
 import { Icon } from "./Icon.jsx";
+import { AccountMenu } from "./AccountMenu.jsx";
+import { NewProjectButton } from "./NewProjectButton.jsx";
+import { ProjectTitle } from "./ProjectTitle.jsx";
+import { Collaborators } from "./Collaborators.jsx";
+import shovelMark from "../../assets/shovel.svg";
 
-export function Header({ storageAvailable, actions }) {
+export function Header({ project, storageAvailable, sync, presence, canEdit, accountLoading, actions }) {
+  const localDolt = Boolean(import.meta.env.VITE_LOCAL_DOLT);
+  const status = !storageAvailable
+    ? "Storage unavailable"
+    : localDolt
+      ? sync.status === "saved" ? "Saved to Dolt" : sync.status === "saving" ? "Saving to Dolt…" : "Local save needs attention"
+    : sync.status === "local"
+      ? "Local draft · not shared"
+      : sync.status === "conflict"
+        ? "Changes need review"
+        : sync.status === "live"
+          ? sync.pending
+            ? "Saving changes…"
+            : "Live saved"
+          : sync.status === "sharing"
+            ? "Creating shared dig…"
+            : sync.status === "offline"
+              ? sync.pending
+                ? `Offline · ${sync.pending} pending`
+                : "Reconnecting…"
+              : "Connection needs attention";
   return (
-    <header className="app-header">
+    <header className={`app-header${localDolt ? " local-dolt" : ""}`}>
       <a className="brand" href="./" aria-label="Diggy home">
-        <canvas
-          className="brand-pick"
+        <img
+          className="brand-shovel"
+          src={shovelMark}
           width="32"
-          height="32"
+          height="36"
+          alt=""
           aria-hidden="true"
-        ></canvas>
+        />
         <span>
           diggy<span className="brand-period">.</span>
         </span>
       </a>
       <div className="header-divider"></div>
-      <span className="workspace-name">The workshop</span>
+      <div className="workspace-name"><ProjectTitle project={project} canEdit={canEdit} actions={actions} /></div>
       <div className="header-end">
-        <span className="local-label">
+        <div className="collaboration-status">
+        <span className="local-label" title={sync.status === "local" ? "Use Share to create a shared dig, then open that invite link in your other browser." : undefined}>
           <span className="status-dot"></span>
-          {storageAvailable
-            ? "Saved on this device"
-            : "Session only — storage unavailable"}
+          <span id="save-status" role="status">
+            {accountLoading ? "Checking sign-in…" : canEdit ? status : `${status} · View only`}
+          </span>
         </span>
+        <Collaborators presence={presence} project={project} />
+        </div>
+        {localDolt && sync.error && <span role="alert" className="local-save-error">{sync.error} {sync.retryable && <button className="button" onClick={actions.retryLocalSave}>Retry save</button>}</span>}
+        {!localDolt && <NewProjectButton canEdit={canEdit} />}
+        {!localDolt && <button
+          id="share-project"
+          className="button share-button"
+          onClick={actions.openShare}
+          aria-label={sync.status === "conflict" ? "Review shared changes" : "Share"}
+          title={sync.status === "conflict" ? "Review shared changes" : "Share this project"}
+        >
+          <Icon name="hyperlink" />
+          <span>{sync.status === "conflict" ? "Review" : "Share"}</span>
+        </button>}
         <button
           onClick={actions.openHelp}
           className="icon-button"
@@ -32,6 +74,7 @@ export function Header({ storageAvailable, actions }) {
         >
           <Icon name="help" />
         </button>
+        {!localDolt && <AccountMenu actions={actions} canEdit={canEdit} />}
       </div>
     </header>
   );

@@ -3,3 +3,13 @@ node_modules/
 .impeccable/review/
 .impeccable/context-cache/
 dist/
+
+.wrangler/
+.dev.vars*
+.env*
+!.env.example
+
+# Embedded Dolt working data and local build artifacts
+.diggy/
+local/web/
+bin/
