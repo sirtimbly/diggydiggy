@@ -42,7 +42,7 @@ export function createProjectController(commit, { storageKey, initial, isShared 
     sceneRevision = 0,
     toast = "",
     canvasPanning;
-  let canEdit = false, accountLoading = true;
+  let canEdit = false, accountLoading = true, localSyncBusy = false;
   const listeners = [],
     frames = new Set();
   function listen(target, type, handler, options) {
@@ -58,7 +58,7 @@ export function createProjectController(commit, { storageKey, initial, isShared 
     return id;
   }
   const store = createProjectStore({
-    canEdit: () => canEdit,
+    canEdit: () => canEdit && !localSyncBusy,
     key: storageKey,
     initial,
     preferInitial,
@@ -229,6 +229,7 @@ export function createProjectController(commit, { storageKey, initial, isShared 
     }, 3500);
   }
   function requireSignIn() {
+    if (localSyncBusy) { notify("Wait for sync to finish before editing."); return false; }
     notify("Sign in to make changes to this project.");
     $("#account-menu")?.showPopover();
     return false;
@@ -1144,6 +1145,8 @@ export function createProjectController(commit, { storageKey, initial, isShared 
   });
 
   const actions = {
+    dismissLocalSyncError() { syncHandlers.dismissError?.(); },
+    syncLocalProject() { return syncHandlers.sync?.(); },
     retryLocalSave() { syncHandlers.retry?.(); },
     requireSignIn,
     setAccount(user, loading = false) {
@@ -1518,7 +1521,7 @@ export function createProjectController(commit, { storageKey, initial, isShared 
       notify("Fresh ground. The demo is reset.");
     },
   };
-  guardProjectEdits(actions, () => canEdit, requireSignIn);
+  guardProjectEdits(actions, () => canEdit && !localSyncBusy, requireSignIn);
   let lastSpriteTime = -1;
   function animate(time) {
     panWhileDragging(time);
@@ -1664,6 +1667,13 @@ export function createProjectController(commit, { storageKey, initial, isShared 
     return result;
   }
   return {
+    setLocalSyncBusy(busy) { localSyncBusy = busy; },
+    hasActiveProjectEdit: () => Boolean(drag || mode !== "inspect" || editGroup || crewEditing || dividerEditor || projectDetailsOpen),
+    replaceLocalProject(project) {
+      state = store.replaceLocalProject(project);
+      if (!getBlock(state.selected)) closeInspector();
+      render();
+    },
     getView,
     actions,
     start,

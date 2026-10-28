@@ -1,27 +1,161 @@
-# Diggy
+# Diggy (`diggydiggy`)
 
-A small project excavation prototype. Depth represents sequence, never time. Colored blocks represent known scope; a vertical dithered absence represents uncertainty. Diggers show where people are working, and cracks show deliberately reported progress.
+A project planning board drawn as an excavation. Blocks represent known work,
+dithered ground represents uncertainty, and diggers show who is working where.
+Depth represents sequence, never time.
 
-Open [diggydiggy.app](https://diggydiggy.app). The [original Workers hostname](https://diggy-diggy.sirtimbly.workers.dev) remains available. Use **Share** to create a project with a private invite link.
+Run it locally with an embedded Dolt database and exchange changes through your
+team's Git remote. There is no hosted database or sign-in requirement in local
+mode. The optional hosted app adds live collaboration.
 
-## Run
+## Install into a project
 
-For a local Go app with embedded Dolt storage and optional Git remote transport,
-use `npm run local:start` after installing the native prerequisites in
-[Local Dolt setup](docs/local-dolt.md). This experimental mode needs no hosted
-sign-in or database server. Diggy's original code is [MIT licensed](LICENSE);
-bundled dependencies and fonts retain their own licenses.
-
-Use Node.js 22.12+ (or 20.19+) and install the dependencies once:
+**The npm package is being prepared; these commands work after the first release
+has been published.** The npm package is `diggydiggy`; its command is `diggy`.
 
 ```sh
-npm install
-npm run dev
+pnpm add --save-dev diggydiggy --allow-build=diggydiggy
+pnpm exec diggy
 ```
 
-Open [Diggy](http://127.0.0.1:4173/). Vite provides the dev server and hot updates; React owns the interface components, with a custom Canvas pixel sprite renderer. Fonts are served locally. The dev server uses a fixed port so existing browser-local projects stay available at the same origin.
+Or add a project script, `"diggy": "diggy"`, and run `pnpm run diggy`. For a global
+installation:
 
-The Cloudflare Vite plugin runs the Worker and its SQLite Durable Objects locally alongside React. Local shared projects persist under `.wrangler/`. `npm run build` creates the client assets in `dist/client/` and Worker bundle in `dist/diggy_diggy/`. `npm run preview` serves the complete production build at http://127.0.0.1:4174/.
+```sh
+pnpm add --global diggydiggy --allow-build=diggydiggy
+diggy
+```
+
+Node.js 22.14+ is required for the npm launcher. Installation downloads the exact
+version's native executable from this repository's GitHub release and verifies
+its SHA-256 checksum against metadata shipped inside the npm package. Go, a
+compiler, and an ICU installation are **not required for published binaries**.
+The `--allow-build` option approves this package's postinstall download under
+pnpm's build policy. If lifecycle scripts are disabled, the launcher downloads
+the binary on first use. Offline users can set `DIGGY_BINARY` to an existing native executable.
+
+Prepared release targets are macOS on Apple Silicon and Intel, plus Linux on
+ARM64 and x64. Linux builds use Ubuntu 22.04 as their compatibility baseline and
+require glibc 2.35+ and the standard C++ runtime; Alpine/musl and Windows are not
+supported by the prebuilt packages. macOS builds use macOS 14 (Apple Silicon) and
+macOS 15 (Intel) runners. All release binaries statically link ICU and embed the
+web app, so they do not depend on Homebrew paths or an external web server.
+Cross-platform builds are verified by the release workflow before publication.
+
+Run `diggy` from your project directory. Open the URL it prints; it tries port
+4180 first, then higher available ports. The board saves under `.diggy/diggy/`.
+Add `.diggy/` to your project's `.gitignore`.
+
+Configure Git sharing once while Diggy is stopped:
+
+```sh
+diggy remote git@github.com:YOUR_ORG/YOUR_PROJECT.git
+diggy
+```
+
+Use **Sync** in the header to save pending work, receive remote changes, and
+upload your commits. The Git remote must already contain a code commit. Database
+history uses a separate Git ref; normal code commits and pulls do not exchange
+board data. **This experimental version supports fast-forward sync only**;
+divergent edits stop with an error and preserve local history.
+
+See [Local Dolt setup](docs/local-dolt.md) for cloning an existing board, custom
+data directories, ports, recovery, and CLI sync commands.
+
+## Build and install from source today
+
+Install [mise](https://mise.jdx.dev/getting-started.html), a C/C++ compiler,
+and ICU development libraries. The committed `mise.toml` pins Node 24.13.1,
+pnpm 12.15.0, Go 1.26.7, and Gitleaks 8.30.1 for developers and CI. Mise installs
+the Go compiler; Go is not needed each time you run the resulting executable.
+
+On macOS:
+
+```sh
+xcode-select --install
+brew install mise icu4c
+```
+
+On Debian/Ubuntu, install mise using its installation guide, plus
+`build-essential`, `pkg-config`, and `libicu-dev`. You do not need to install
+Node, pnpm, or Go separately.
+
+From this checkout:
+
+```sh
+mise trust
+mise install
+mise run setup
+mise run local:install
+cd /path/to/your/project
+diggy
+```
+
+This builds the web assets and Go executable, then copies `diggy` to
+`~/.local/bin`. The installer prints PATH instructions if needed. Re-run it after
+source changes. A custom prefix is supported with
+`mise run local:install -- --prefix /your/location`.
+
+To install through Go instead, first build the web assets, then use the helper
+that supplies ICU compiler/linker paths:
+
+```sh
+mise run build:local
+GOBIN="$HOME/.local/bin" mise exec -- sh scripts/local-go.sh install ./cmd/diggy
+```
+
+Alternatively omit `GOBIN` to use Go's configured executable directory (normally
+`$(go env GOPATH)/bin`) and add it to PATH. Build from a checkout: the module is
+currently local, so a remote `go install github.com/...@version` command is not
+provided. Source-development builds link to local ICU; use
+`mise run release:binary` for a standalone build with static ICU linkage.
+
+Development tasks use `mise run <task>`; `mise tasks` lists them. These commands
+work without shell activation. To use `pnpm` or `go` directly, activate mise in
+your shell or use `mise exec -- pnpm …` / `mise exec -- go …`. The package-manager
+version is also recorded in `package.json`, and `pnpm-lock.yaml` is the only
+JavaScript dependency lockfile. Use `mise exec -- pnpm add --save-dev <package>`
+to add a development dependency.
+
+## Optional hosted app and web development
+
+Open [diggydiggy.app](https://diggydiggy.app) for the hosted version. The
+[original Workers hostname](https://diggy-diggy.sirtimbly.workers.dev) also remains
+available. Hosted editing requires sign-in, and **Share** creates a private
+invite link. These account requirements do not apply to embedded local mode.
+
+For React/Worker development in this checkout:
+
+```sh
+mise install
+mise run setup
+mise run dev
+```
+
+Open <http://127.0.0.1:4173/>. Vite provides hot updates and runs the Worker and
+SQLite Durable Objects locally; shared projects persist under `.wrangler/`.
+`mise run build` creates client assets in `dist/client/` and the Worker bundle in
+`dist/diggy_diggy/`. `mise run preview` serves that build on port 4174. See
+[Cloudflare setup](docs/cloudflare-sync.md) for hosted OAuth and deployment.
+
+Diggy's original source is [MIT licensed](LICENSE). Fonts, Dolt, ICU, and other
+dependencies retain their own licenses. Native release archives and the npm
+package include collected third-party notices.
+
+## Release and security checks
+
+See [Releasing](docs/releasing.md) for the native build matrix, release-please,
+npm trusted publishing, and a clean dev-dependency installation check. No package
+or release is published by running the local build commands.
+
+```sh
+mise run check
+mise run secrets:check
+```
+
+The secret scan uses the mise-managed Gitleaks and checks all Git refs/reflogs plus current
+tracked and unignored source files. Reports are redacted and stay under ignored
+`bin/security/`.
 
 ## Source layout
 
@@ -33,7 +167,7 @@ The Cloudflare Vite plugin runs the Worker and its SQLite Durable Objects locall
 
 React renders committed task placements. Pointer previews update the current scene directly for immediate feedback, then a committed placement replaces that transient scene. Inspector form state stays within React. Controller disposal removes event listeners, pointer capture, observers, animation frames, and timers during module replacement.
 
-## Undo and live sharing
+## Undo and hosted live sharing
 
 Sign in, then use **New project** in the header to open a blank project with its own private sharing link. It starts without sample blocks or crew; use **Add your first block** and **Manage crew** to build it out. Your previous project stays intact. The Diggy home link returns to your original browser-local draft; keep each shared project's invite link to return to it. Creation requires a connection; a failure keeps you on the current board with a retryable message.
 
@@ -47,7 +181,7 @@ Pending edits survive connection loss and replay on reconnect. Conflicting edits
 
 See [Cloudflare setup and deployment](docs/cloudflare-sync.md) for Wrangler authentication, architecture, access, and deployment commands.
 
-## Sign-in and editing
+## Hosted sign-in and editing
 
 The header’s **Sign in** menu supports Google and GitHub OAuth. A valid sign-in is required to create projects or change any project data, including local drafts, names, subtitles, blocks, crew, phases, and undo/redo. Signed-out visitors can view and navigate. Shared digs also require their private invite link; signing in alone does not grant access. Signing out stops editing while preserving viewing access and saved work. The server checks the account session for creation and every shared mutation, including existing WebSockets after logout or expiry.
 
@@ -76,7 +210,7 @@ Keyboard users can select people and blocks with native buttons and manage assig
 
 ## Verify
 
-`npm run check` runs the geometry, interaction, history, and store tests, checks Worker TypeScript, runs Worker integration tests in the Cloudflare runtime, and builds the complete application. Worker tests cover private sessions, atomic conflicting edits, duplicate receipts, reconnects, project isolation, and fan-out to twenty connections. Tests cover collision-free mixed sizes and uncertainty, supported placement, stable extraction, reserved holes during dragging/resizing, migration, determinism, and growing the excavation. Browser checks cover vertical wheel scrolling, middle-button and Space panning, depth growth, live collision/dependency constraints, exact extraction, exposed shafts, worker access, migration, and mobile overflow.
+`mise run check` runs the geometry, interaction, history, and store tests, checks Worker TypeScript, runs Worker integration tests in the Cloudflare runtime, and builds the complete application. Worker tests cover private sessions, atomic conflicting edits, duplicate receipts, reconnects, project isolation, and fan-out to twenty connections. Tests cover collision-free mixed sizes and uncertainty, supported placement, stable extraction, reserved holes during dragging/resizing, migration, determinism, and growing the excavation. Browser checks cover vertical wheel scrolling, middle-button and Space panning, depth growth, live collision/dependency constraints, exact extraction, exposed shafts, worker access, migration, and mobile overflow.
 
 ## Placement model
 

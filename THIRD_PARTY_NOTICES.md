@@ -12,5 +12,7 @@ Dependencies and bundled fonts retain their upstream licenses.
   consult their distributed license files and pinned dependency manifests.
 
 When distributing compiled binaries, include the applicable dependency licenses
-and notices, including native ICU libraries if bundled. Local builds currently
-link against the machine's ICU installation.
+and notices, including native ICU libraries if bundled. Development builds link against the machine's ICU installation. Release builds
+link ICU statically and collect upstream Go, JavaScript, and ICU notices into
+per-platform license archives. Those archives are also included in the prepared
+npm package. System libc/C++ runtimes are not bundled.

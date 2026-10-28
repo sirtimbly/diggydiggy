@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Public localStorage preference name, not a credential"
+condition = "AND"
+paths = ['''(^|/)crew-palette-drag\.js$''']
+regexTarget = "secret"
+regexes = ['''^diggy-crew-position-v1$''']

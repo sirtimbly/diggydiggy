@@ -1,0 +1,96 @@
+[tools]
+node = "24.13.1"
+pnpm = "12.15.0"
+go = "1.26.7"
+gitleaks = "8.30.1"
+
+[tasks.setup]
+description = "Install JavaScript dependencies from the committed lockfile"
+run = "pnpm install --frozen-lockfile"
+
+[tasks.dev]
+run = "pnpm run dev"
+
+[tasks.build]
+run = "pnpm run build"
+
+[tasks.preview]
+run = "pnpm run preview"
+
+[tasks.check]
+description = "Verify the web app, local Go app, and package installer"
+run = ["pnpm run check", "pnpm run test:local", "pnpm run test:package"]
+
+[tasks.typecheck]
+run = "pnpm run typecheck"
+
+[tasks."test:unit"]
+run = "pnpm run test:unit"
+
+[tasks."test:worker"]
+run = "pnpm run test:worker"
+
+[tasks."test:local"]
+run = "pnpm run test:local"
+
+[tasks."test:package"]
+run = "pnpm run test:package"
+
+[tasks."build:local"]
+run = "pnpm run build:local"
+
+[tasks."local:build"]
+run = "pnpm run local:build"
+
+[tasks."local:start"]
+run = "pnpm run local:start"
+
+[tasks."local:install"]
+run = "pnpm run local:install"
+
+[tasks."release:binary"]
+run = "pnpm run release:binary"
+
+[tasks."release:prepare"]
+run = "pnpm run release:prepare"
+
+[tasks."release:pack"]
+run = "node npm/validate.mjs && pnpm pack"
+
+[tasks."release:publish"]
+description = "Publish an existing, tested tarball to the npm registry"
+run = "pnpm publish diggydiggy-*.tgz --access public --provenance --no-git-checks"
+
+[tasks."smoke:package"]
+run = "node scripts/smoke-package.mjs"
+
+[tasks."smoke:native"]
+run = "node scripts/smoke-native.mjs"
+
+[tasks."secrets:check"]
+run = "pnpm run secrets:check"
+
+[tasks."lint:workflows"]
+tools = { actionlint = "1.7.12" }
+run = "actionlint"
+
+[tasks."dev:worker"]
+run = "pnpm run dev:worker"
+
+[tasks."cf:types"]
+run = "pnpm run cf:types"
+
+[tasks."cf:login"]
+run = "pnpm run cf:login"
+
+[tasks."cf:whoami"]
+run = "pnpm run cf:whoami"
+
+[tasks."deploy:check"]
+run = "pnpm run deploy:check"
+
+[tasks."deploy:staging"]
+run = "pnpm run deploy:staging"
+
+[tasks.deploy]
+run = "pnpm run deploy"

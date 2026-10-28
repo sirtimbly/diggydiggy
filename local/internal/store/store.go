@@ -17,6 +17,8 @@ import (
 )
 
 var ErrStale = errors.New("the project has changed; reload before saving")
+var ErrNoRemote = errors.New("no origin remote configured")
+var ErrDiverged = errors.New("local and remote histories have diverged")
 
 type key struct{ Kind, Entity, Field string }
 type cells map[key]string
@@ -112,14 +114,20 @@ func open(ctx context.Context, directory, name, email, cloneURL string) (*Store,
 	return s, nil
 }
 
-// Remote operations run only as explicit CLI commands, with the web server
-// stopped. Divergent history is refused until a resolution workflow exists.
 func (s *Store) Remote(ctx context.Context, remote string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	_, err := s.db.ExecContext(ctx, "CALL DOLT_REMOTE('add', 'origin', ?)", remote)
 	return err
 }
 
 func (s *Store) Sync(ctx context.Context, push bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.sync(ctx, push)
+}
+
+func (s *Store) sync(ctx context.Context, push bool) error {
 	var branch string
 	if err := s.db.QueryRowContext(ctx, "SELECT active_branch()").Scan(&branch); err != nil {
 		return err
@@ -133,6 +141,57 @@ func (s *Store) Sync(ctx context.Context, push bool) error {
 	}
 	_, err := s.db.ExecContext(ctx, "CALL DOLT_MERGE('--ff-only', ?)", "origin/"+branch)
 	return err
+}
+
+// Exchange shares the engine's lock with saves, so no browser can write between
+// the precondition check, pull, and push. Always return the resulting snapshot:
+// a push failure can follow a successful pull.
+func (s *Store) Exchange(ctx context.Context, expected string) (Project, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, err := s.read(ctx)
+	if err != nil {
+		return nil, "", err
+	}
+	p, err := expand(c)
+	if err != nil {
+		return nil, "", err
+	}
+	if expected != tag(p) {
+		return p, tag(p), ErrStale
+	}
+	var count int
+	if err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dolt_remotes WHERE name = 'origin'").Scan(&count); err != nil {
+		return p, tag(p), err
+	}
+	if count == 0 {
+		return p, tag(p), ErrNoRemote
+	}
+	if _, err = s.db.ExecContext(ctx, "CALL DOLT_FETCH('origin')"); err == nil {
+		var branch string
+		err = s.db.QueryRowContext(ctx, "SELECT active_branch()").Scan(&branch)
+		if err == nil {
+			err = s.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM dolt_remote_branches WHERE name = ?", "remotes/origin/"+branch).Scan(&count)
+		}
+		if err == nil && count > 0 {
+			_, err = s.db.ExecContext(ctx, "CALL DOLT_MERGE('--ff-only', ?)", "origin/"+branch)
+			if err != nil {
+				err = fmt.Errorf("%w: %v", ErrDiverged, err)
+			}
+		}
+		if err == nil {
+			err = s.sync(ctx, true)
+		}
+	}
+	c, readErr := s.read(ctx)
+	if readErr != nil {
+		return nil, "", errors.Join(err, readErr)
+	}
+	p, readErr = expand(c)
+	if readErr != nil {
+		return nil, "", errors.Join(err, readErr)
+	}
+	return p, tag(p), err
 }
 
 func (s *Store) Close() error {

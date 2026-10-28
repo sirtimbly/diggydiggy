@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -10,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"diggy.local/app/internal/store"
 )
@@ -34,6 +36,41 @@ func New(db *store.Store, web fs.FS, host string) http.Handler {
 		}
 		if r.Header.Get("Sec-Fetch-Site") == "cross-site" {
 			http.Error(w, "cross-site request", http.StatusForbidden)
+			return
+		}
+		if r.URL.Path == "/api/local/sync" {
+			if r.Method != http.MethodPost {
+				w.Header().Set("Allow", "POST")
+				w.WriteHeader(http.StatusMethodNotAllowed)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			if r.Header.Get("If-Match") == "" {
+				http.Error(w, `{"error":"Reload before syncing"}`, http.StatusPreconditionRequired)
+				return
+			}
+			ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+			defer cancel()
+			p, etag, err := db.Exchange(ctx, r.Header.Get("If-Match"))
+			status, message := http.StatusOK, ""
+			if err != nil {
+				log.Printf("local sync: %v", err)
+				switch {
+				case errors.Is(err, store.ErrStale):
+					status, message = http.StatusPreconditionFailed, "Another tab changed this project. Reload before syncing."
+				case errors.Is(err, store.ErrNoRemote):
+					status, message = http.StatusConflict, "Set up a Git remote first: run diggy remote <your-repository-url> with the app stopped, then restart."
+				case errors.Is(err, store.ErrDiverged):
+					status, message = http.StatusConflict, "Both copies have new changes. Automatic merging is not available yet; your local work is preserved."
+				default:
+					status, message = http.StatusBadGateway, "Sync could not finish. Check your Git access and connection, then try Sync again."
+				}
+			}
+			if etag != "" {
+				w.Header().Set("ETag", etag)
+			}
+			w.WriteHeader(status)
+			json.NewEncoder(w).Encode(map[string]any{"project": p, "error": message})
 			return
 		}
 		if r.URL.Path != "/api/local/project" {

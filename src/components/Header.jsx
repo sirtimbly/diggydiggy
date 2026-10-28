@@ -10,7 +10,7 @@ export function Header({ project, storageAvailable, sync, presence, canEdit, acc
   const status = !storageAvailable
     ? "Storage unavailable"
     : localDolt
-      ? sync.status === "saved" ? "Saved to Dolt" : sync.status === "saving" ? "Saving to Dolt…" : "Local save needs attention"
+      ? sync.remoteSyncing ? "Syncing with Git…" : sync.status === "saved" ? sync.syncMessage || "Saved to Dolt" : sync.status === "saving" ? "Saving to Dolt…" : "Local save needs attention"
     : sync.status === "local"
       ? "Local draft · not shared"
       : sync.status === "conflict"
@@ -48,12 +48,21 @@ export function Header({ project, storageAvailable, sync, presence, canEdit, acc
         <span className="local-label" title={sync.status === "local" ? "Use Share to create a shared dig, then open that invite link in your other browser." : undefined}>
           <span className="status-dot"></span>
           <span id="save-status" role="status">
-            {accountLoading ? "Checking sign-in…" : canEdit ? status : `${status} · View only`}
+            {localDolt ? status : accountLoading ? "Checking sign-in…" : canEdit ? status : `${status} · View only`}
           </span>
         </span>
         <Collaborators presence={presence} project={project} />
         </div>
-        {localDolt && sync.error && <span role="alert" className="local-save-error">{sync.error} {sync.retryable && <button className="button" onClick={actions.retryLocalSave}>Retry save</button>}</span>}
+        {localDolt && <button className="button local-sync-button" onClick={actions.syncLocalProject}
+          disabled={sync.remoteSyncing || sync.retryable === false || !canEdit} aria-busy={Boolean(sync.remoteSyncing)}
+          title="Receive and send saved changes through your Git remote">
+          <Icon name="sync" /><span>{sync.remoteSyncing ? "Syncing…" : "Sync"}</span>
+        </button>}
+        {localDolt && (sync.error || sync.remoteError) && <span role="alert" className="local-save-error">
+          {sync.error || sync.remoteError}
+          {sync.error && sync.retryable && <button className="button" onClick={actions.retryLocalSave}>Retry save</button>}
+          {!sync.error && sync.remoteError && <button className="button" onClick={actions.dismissLocalSyncError}>Dismiss</button>}
+        </span>}
         {!localDolt && <NewProjectButton canEdit={canEdit} />}
         {!localDolt && <button
           id="share-project"

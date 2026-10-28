@@ -1,0 +1,33 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+permissions:
+  contents: read
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, macos-14]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.21'
+      - name: Install ICU development libraries
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == macOS ]]; then brew list icu4c >/dev/null 2>&1 || brew install icu4c
+          else sudo apt-get update && sudo apt-get install -y libicu-dev pkg-config; fi
+      - run: mise run setup
+      - run: mise run check
+      - run: mise run lint:workflows
+      - name: Scan history and current files
+        if: runner.os == 'Linux'
+        run: |
+          mise run secrets:check

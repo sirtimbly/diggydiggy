@@ -7,26 +7,27 @@ Diggy runs as one Worker with Static Assets and a SQLite Durable Object per proj
 ## Local development
 
 ```sh
-npm install
-npm run dev
+mise install
+mise run setup
+mise run dev
 ```
 
 Open http://127.0.0.1:4173/. The Cloudflare Vite plugin runs both React and the Worker; shared rooms use local SQLite under ignored `.wrangler/`. A local invite works only for browsers that can reach that development origin. Production invites use the deployed origin.
 
 ## Wrangler setup
 
-Use the project-local Wrangler through npm/npx:
+Use the project-local Wrangler through mise and pnpm:
 
 ```sh
-npm run cf:login
-npm run cf:whoami
-npm run cf:types
-npm run check
-npm run deploy:check
-npm run deploy
+mise run cf:login
+mise run cf:whoami
+mise run cf:types
+mise run check
+mise run deploy:check
+mise run deploy
 ```
 
-`npm run cf:login` uses device authorization: approve the short code on Cloudflare’s site within five minutes. Keep the command running until it reports success. It avoids the temporary localhost callback server used by plain `wrangler login`; that server closes after two minutes, so an older approval link will lead to an unavailable localhost page. Start a new login if the code expires.
+`mise run cf:login` uses device authorization: approve the short code on Cloudflare’s site within five minutes. Keep the command running until it reports success. It avoids the temporary localhost callback server used by plain `wrangler login`; that server closes after two minutes, so an older approval link will lead to an unavailable localhost page. Start a new login if the code expires.
 
 `wrangler.jsonc` selects account `a8d34ac4c43d2065eb53587d152760ae` and Worker `diggy-diggy`. For a different account, change `account_id`. Authentication may instead use `CLOUDFLARE_API_TOKEN` in the shell or CI secret store with Workers deployment and account-read permissions. Do not commit credentials. Runtime secrets from Reef are not needed.
 
@@ -34,7 +35,7 @@ The production config attaches `diggydiggy.app` as a [Worker Custom Domain](http
 
 The Vite build produces `dist/client/` and `dist/diggy_diggy/` and writes Wrangler's deployment redirect. Deploy after building; Wrangler uploads the generated Worker and its assets. The `v1` migration creates the SQLite-backed `ProjectRoom` class automatically. The object constructor creates its tables idempotently. Future Durable Object class changes need new Wrangler migration tags; project schema changes need explicit data migration code.
 
-`npm run deploy:staging` checks the app, builds with `CLOUDFLARE_ENV=staging`, and deploys `diggy-diggy-staging` with a separate project namespace and workers.dev hostname. Production adds `diggydiggy.app` and keeps its workers.dev hostname. No Reef domains, routes, databases, or deployments are changed. For Workers Builds, use `npm run check` as the build command and `npx wrangler deploy` as the deploy command; configure the staging build environment separately if needed.
+`mise run deploy:staging` checks the app, builds with `CLOUDFLARE_ENV=staging`, and deploys `diggy-diggy-staging` with a separate project namespace and workers.dev hostname. Production adds `diggydiggy.app` and keeps its workers.dev hostname. No Reef domains, routes, databases, or deployments are changed. For Workers Builds, use `mise run check` as the build command and `mise exec -- pnpm exec wrangler deploy` as the deploy command; configure the staging build environment separately if needed.
 
 ## Sharing and access
 
@@ -70,20 +71,20 @@ Copy the committed empty template to the ignored local secret file and fill in y
 
 ```sh
 cp .env.example .dev.vars
-npm run dev
+mise run dev
 ```
 
 Configure production secrets using interactive prompts; never put actual secrets in source or shell arguments:
 
 ```sh
-npx wrangler secret put GOOGLE_CLIENT_ID
-npx wrangler secret put GOOGLE_CLIENT_SECRET
-npx wrangler secret put GITHUB_CLIENT_ID
-npx wrangler secret put GITHUB_CLIENT_SECRET
-npm run deploy
+mise exec -- pnpm exec wrangler secret put GOOGLE_CLIENT_ID
+mise exec -- pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET
+mise exec -- pnpm exec wrangler secret put GITHUB_CLIENT_ID
+mise exec -- pnpm exec wrangler secret put GITHUB_CLIENT_SECRET
+mise run deploy
 ```
 
-For staging, add `--env staging` to each `wrangler secret put` command and use `npm run deploy:staging`. Each provider is enabled independently only when both its ID and secret exist. OAuth credentials are optional deployment bindings; a provider with missing credentials stays disabled. `npm run cf:types` reads only the credential names from the empty `.env.example` template for type generation. A deployment includes the additive `v2` migration for the SQLite-backed `AuthSession` class without changing existing project rooms.
+For staging, add `--env staging` to each `wrangler secret put` command and use `mise run deploy:staging`. Each provider is enabled independently only when both its ID and secret exist. OAuth credentials are optional deployment bindings; a provider with missing credentials stays disabled. `mise run cf:types` reads only the credential names from the empty `.env.example` template for type generation. A deployment includes the additive `v2` migration for the SQLite-backed `AuthSession` class without changing existing project rooms.
 
 Sign-in uses authorization code exchange with S256 PKCE, a random 256-bit state bound to an HttpOnly SameSite=Lax cookie, and a single-use server-side flow that expires after ten minutes. Successful sign-in issues a separate random 256-bit HttpOnly account cookie valid for thirty days, stored only as a hash in its object address. Cookies are Secure on HTTPS. The server reads the authenticated profile, then discards provider access/refresh tokens. Session records contain only the provider, stable ID, and display name; alarms remove expired state. Return URLs are limited to the local draft or a valid project URL; invite fragments never go to OAuth providers. Failures return a retryable message without exposing provider error details.
 
@@ -118,8 +119,8 @@ Undo and redo emit compensating edits. They skip fields subsequently changed by 
 ## Verification
 
 ```sh
-npm run check
-npm run deploy:check
+mise run check
+mise run deploy:check
 ```
 
 Worker tests run in workerd and exercise private sessions, duplicate commands, atomic conflicts, malformed edits, isolation, and twenty concurrent connections. Browser checks cover two isolated sessions, shared rename/undo/redo, conflicts, offline queue replay, reload, local-draft preservation, and mobile sharing. `/healthz` provides a small deployment smoke endpoint.

@@ -169,6 +169,17 @@ export function createProjectStore({
     };
   }
   return {
+    replaceLocalProject(incoming) {
+      if (syncEnabled) throw new Error("Cannot replace a shared project through local storage.");
+      const candidate = structuredClone(incoming);
+      if (!validProject(candidate)) throw new Error("The synced project is invalid.");
+      applyMasonry(candidate);
+      document = projectDocument(candidate);
+      history.clear();
+      persist(project.selected);
+      emit({ source: "remote" });
+      return materializeProject(document, project.selected);
+    },
     commit,
     undo: () => travel("undo"),
     redo: () => travel("redo"),

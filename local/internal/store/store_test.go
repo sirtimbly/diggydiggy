@@ -88,6 +88,18 @@ func TestCodecSeparatesRelationshipsAndRejectsBadShapes(t *testing.T) {
 	}
 }
 
+func exchange(t *testing.T, s *Store) {
+	t.Helper()
+	ctx := context.Background()
+	_, etag, err := s.Load(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err = s.Exchange(ctx, etag); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestGitRemotePushCloneAndFastForwardPull(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git required")
@@ -115,9 +127,7 @@ func TestGitRemotePushCloneAndFastForwardPull(t *testing.T) {
 	if err = a.Remote(ctx, remote); err != nil {
 		t.Fatal(err)
 	}
-	if err = a.Sync(ctx, true); err != nil {
-		t.Fatal(err)
-	}
+	exchange(t, a)
 	if err = a.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -133,9 +143,7 @@ func TestGitRemotePushCloneAndFastForwardPull(t *testing.T) {
 	if _, err = b.Save(ctx, loaded, etag); err != nil {
 		t.Fatal(err)
 	}
-	if err = b.Sync(ctx, true); err != nil {
-		t.Fatal(err)
-	}
+	exchange(t, b)
 	if err = b.Close(); err != nil {
 		t.Fatal(err)
 	}
@@ -143,9 +151,7 @@ func TestGitRemotePushCloneAndFastForwardPull(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = a.Sync(ctx, false); err != nil {
-		t.Fatal(err)
-	}
+	exchange(t, a)
 	loaded, _, err = a.Load(ctx)
 	if err != nil || loaded["name"] != "From B" {
 		t.Fatalf("pull: %v, %v", loaded, err)
@@ -180,8 +186,9 @@ func TestGitRemotePushCloneAndFastForwardPull(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer a.Close()
-	if err = a.Sync(ctx, false); err == nil {
-		t.Fatal("divergent history merged unexpectedly")
+	_, etag, _ = a.Load(ctx)
+	if _, _, err = a.Exchange(ctx, etag); !errors.Is(err, ErrDiverged) {
+		t.Fatalf("expected divergent history refusal, got %v", err)
 	}
 	loaded, _, err = a.Load(ctx)
 	if err != nil || loaded["name"] != "Local A" || loaded["subtitle"] != nil {

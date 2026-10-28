@@ -1,0 +1,5 @@
+# pnpm's isolated dependency layout is intentional. Only native tooling needed
+# by the web/Worker build may run dependency installation scripts.
+allowBuilds:
+  esbuild: true
+  workerd: true

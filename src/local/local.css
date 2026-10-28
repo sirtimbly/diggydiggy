@@ -1,3 +1,5 @@
 /* Local persistence status stays visible at the narrow desktop-panel widths. */
 .app-header.local-dolt .local-label { display: flex; font-size: 11px; }
+.local-sync-button { gap: 6px; white-space: nowrap; }
+@media (max-width: 420px) { .app-header.local-dolt .local-label { max-width: 115px; white-space: normal; line-height: 1.25; } .local-sync-button { padding: 6px 8px; } }
 .local-save-error { position: fixed; z-index: 100; top: 68px; right: 12px; max-width: min(480px, calc(100vw - 24px)); padding: 12px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); box-shadow: 0 4px 18px #0002; }

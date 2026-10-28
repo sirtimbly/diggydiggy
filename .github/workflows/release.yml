@@ -1,0 +1,107 @@
+name: release
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing version tag (for example v0.1.0)
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      tag:
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: darwin_arm64
+          - os: macos-15-intel
+            target: darwin_amd64
+          - os: ubuntu-22.04
+            target: linux_amd64
+          - os: ubuntu-22.04-arm
+            target: linux_arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.21'
+      - name: Validate tag and native platform
+        env:
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: |
+          node --input-type=module <<'JS'
+          import { readFileSync } from 'node:fs';
+          import { platformTarget } from './npm/native.mjs';
+          const {version} = JSON.parse(readFileSync('package.json', 'utf8'));
+          if (process.env.RELEASE_TAG !== `v${version}` || platformTarget() !== process.env.RELEASE_TARGET) process.exit(1);
+          JS
+      - name: Install ICU development libraries
+        shell: bash
+        run: |
+          if [[ "$RUNNER_OS" == macOS ]]; then brew list icu4c >/dev/null 2>&1 || brew install icu4c
+          else sudo apt-get update && sudo apt-get install -y libicu-dev pkg-config; fi
+      - run: mise run setup
+      - run: mise run test:unit && mise run test:package
+      - run: mise run test:local
+      - run: mise run release:binary
+      - name: Smoke test the standalone release executable
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
+        run: mise run smoke:native -- ".release/$RELEASE_TARGET/diggy"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: native-${{ matrix.target }}
+          path: .release/assets/*
+          include-hidden-files: true
+          if-no-files-found: error
+  package:
+    needs: build
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag || github.ref_name }}
+      - uses: jdx/mise-action@v5
+        with:
+          version: '2026.10.21'
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: native-*
+          path: .release/assets
+          merge-multiple: true
+      - run: mise run setup
+      - name: Prepare checksums, repository URLs, and bundled notices
+        run: mise run release:prepare -- --repository "$GITHUB_REPOSITORY"
+      - run: mise run release:pack
+      - name: Upload binaries and npm package to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" --verify-tag --generate-notes
+          gh release upload "$RELEASE_TAG" .release/assets/*.gz .release/assets/SHA256SUMS diggydiggy-*.tgz
+      - name: Verify installation from the exact npm tarball
+        run: mise run smoke:package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: npm-package
+          path: diggydiggy-*.tgz
+          if-no-files-found: error

@@ -38,6 +38,20 @@ test("authoritative local SQL startup ignores a stale browser recovery cache", (
   assert.equal(store.getStatus().syncEnabled, false);
 });
 
+test("received local SQL snapshots clear stale undo and do not enqueue another save", () => {
+  const { store } = setup();
+  edit(store, (p) => { p.name = "Local edit"; });
+  assert.equal(store.getStatus().canUndo, true);
+  const events = [];
+  store.subscribe((event) => events.push(event));
+  const received = { ...emptyProject(), name: "Received from Git" };
+  store.replaceLocalProject(received);
+  assert.equal(store.getProject().name, "Received from Git");
+  assert.equal(store.getStatus().canUndo, false);
+  assert.deepEqual(events.map((event) => event.source), ["remote"]);
+  assert.equal(store.getStatus().pendingCount, 0);
+});
+
 test("an acknowledgement at the current revision clears an already-applied outbox command", () => {
   const { store } = setup();
   store.enableSync({ projectId: "shared", revision: 1 });

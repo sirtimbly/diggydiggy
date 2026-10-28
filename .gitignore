@@ -13,3 +13,8 @@ dist/
 .diggy/
 local/web/
 bin/
+
+.release/
+.diggy-native/
+*.tgz
+npm/licenses/

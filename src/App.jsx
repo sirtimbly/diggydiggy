@@ -27,7 +27,7 @@ export default function App({ view, actions }) {
       {!view.canEdit && !view.accountLoading && <div className="edit-access-notice" role="status">
         View only. <button type="button" onClick={actions.requireSignIn}>Sign in to make changes</button>
       </div>}
-      <main>
+      <main inert={Boolean(view.sync.remoteSyncing)} aria-busy={Boolean(view.sync.remoteSyncing)}>
         <div className="workbench">
           <section className="dig-panel" aria-label="Project excavation">
             <Toolbar view={view} actions={actions} />

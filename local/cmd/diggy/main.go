@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,12 +17,19 @@ import (
 	"diggy.local/app/internal/store"
 )
 
+var version = "dev"
+
 func main() {
+	showVersion := flag.Bool("version", false, "print the installed version")
 	directory := flag.String("data", ".diggy", "database parent directory (database lives in <data>/diggy)")
-	port := flag.Int("port", 4180, "local web port")
+	port := flag.Int("port", 4180, "preferred local web port (tries higher ports when occupied)")
 	name := flag.String("name", "Diggy local", "Dolt commit author name")
 	email := flag.String("email", "local@diggy.invalid", "Dolt commit author email")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println(version)
+		return
+	}
 	command := "serve"
 	if flag.NArg() > 0 {
 		command = flag.Arg(0)
@@ -72,12 +78,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	host := fmt.Sprintf("127.0.0.1:%d", *port)
-	listener, err := net.Listen("tcp4", host)
+	listener, err := listenLocal(*port)
 	if err != nil {
 		log.Fatal(err)
 	}
-	srv := &http.Server{Handler: server.New(db, web, host), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second}
+	host := listener.Addr().String()
+	srv := &http.Server{Handler: server.New(db, web, host), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 2 * time.Minute, IdleTimeout: 60 * time.Second}
 	shutdownDone := make(chan struct{})
 	go func() {
 		defer close(shutdownDone)

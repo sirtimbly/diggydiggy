@@ -5,10 +5,10 @@ in-process. There is no hosted account service, Worker, database server, or
 WebSocket connection. All edits, including undo and redo, save locally. The hosted
 version remains available through the existing commands.
 
-## Build and start
+## Install for local development
 
-Install Node.js as described in the main README, Go (the module pins Go 1.26.7;
-Go's automatic toolchain download is supported), a C/C++ compiler, and ICU4C.
+Install mise as described in the main README, a C/C++ compiler, and ICU4C.
+Mise installs the pinned Node, pnpm, and Go versions.
 On macOS, install ICU with `brew install icu4c`; the build helper finds Homebrew's
 headers and libraries. On Debian/Ubuntu, install `build-essential` and `libicu-dev`.
 The native ICU requirement comes from the embedded Dolt driver.
@@ -16,19 +16,47 @@ The native ICU requirement comes from the embedded Dolt driver.
 From the Diggy source directory:
 
 ```sh
-npm install
-npm run local:start
+mise trust
+mise install
+mise run setup
+mise run local:install
 ```
 
-Open <http://127.0.0.1:4180>. The first board starts empty. Add blocks and crew as
-usual; no sign-in is needed. Wait for **Saved to Dolt** before closing the page.
+This builds the web app and Go executable, then installs `diggy` into
+`~/.local/bin` without requiring administrator access. If that directory is not
+on your PATH, the installer prints the line to add to your shell startup file
+(`~/.zshrc` for zsh or `~/.bashrc` for bash). Open a new terminal after adding it.
 
-`npm run local:build` builds `bin/diggy`. After that, run the executable from any
-project checkout to keep its board with that project:
+Run the installed command from any project checkout to keep its board with that
+project:
 
 ```sh
-/path/to/diggy/bin/diggy
+cd /path/to/your/project
+diggy
 ```
+
+Open the URL printed by Diggy. It starts at <http://127.0.0.1:4180> and tries
+4181, 4182, and successive ports if earlier ports are occupied. The first board
+starts empty. Add blocks and crew as usual; no sign-in is needed. Wait for
+**Saved to Dolt** before closing the page.
+
+Re-run `mise run local:install` from the Diggy source directory after changing the
+source. The installed executable is a copy, so rebuilding alone does not update
+it. To choose another installation prefix:
+
+```sh
+mise run local:install -- --prefix /your/preferred/location
+```
+
+The command is installed at `<prefix>/bin/diggy`. `PREFIX` can also set the
+prefix; `--prefix` takes precedence. Choose a directory you can write to.
+To uninstall the default installation, remove `~/.local/bin/diggy`; project
+databases remain in their project directories.
+
+For a one-off run from the source directory without installing, use
+`mise run local:start`. `mise run local:build` only builds `bin/diggy`.
+This source installer is the current development workflow; a published npm
+package is a separate future distribution step.
 
 The default database is `.diggy/diggy/`, relative to the current directory. Add
 `.diggy/` to that project's `.gitignore`. Dolt synchronizes its data through a
@@ -37,49 +65,66 @@ separate Git ref; do not commit its working database files as ordinary Git files
 Options must precede the command:
 
 ```sh
-./bin/diggy -data /path/to/project/.diggy -port 4181 -name "Your name" -email "you@example.com"
+diggy -data /path/to/project/.diggy -port 4181 -name "Your name" -email "you@example.com"
 ```
 
-The executable embeds the built web assets but currently links to the system's
-ICU libraries. Moving it to a different machine requires compatible native
-libraries. No separate Dolt installation is required.
+`-port` sets the first port to try; occupied ports are skipped up to port 65535.
+Each running project needs its own data directory as well as an available port.
+Browser preferences and recovery caches are specific to the selected port's origin.
+
+The development executable embeds the built web assets and links to the build
+machine's ICU libraries. `mise run release:binary` creates a standalone executable
+with ICU linked statically; native release builds and npm installs use this
+form. Linux release binaries still require glibc 2.35+ and the system C++ runtime.
+No separate Dolt installation is required. See the main README for npm
+installation and direct Go installation instructions.
 
 ## Share through an existing Git remote
 
-Stop the running local app before using remote commands. They open the same
+The header's **Sync** button saves pending edits, receives fast-forward changes,
+and uploads local commits using the database's `origin` remote. Editing pauses
+briefly during sync, and received work appears on the board automatically. The
+button shows **Syncing…**, then **Synced with Git**, or a retryable error. Save or
+cancel open forms before syncing. Another tab's unsaved changes are not included.
+
+Configure the remote once using the command below, or clone an existing database.
+Stop the running local app before using CLI remote commands. They open the same
 embedded database and need its exclusive lock. Git must be installed and the Git
 remote must already contain at least one code commit. Existing Git SSH/HTTPS
 authentication is used.
 
-On the first machine, configure the board's remote and upload its saved history:
+On the first machine, configure the board's remote:
 
 ```sh
-./bin/diggy remote git@github.com:YOUR_ORG/YOUR_PROJECT.git
-./bin/diggy push
+diggy remote git@github.com:YOUR_ORG/YOUR_PROJECT.git
 ```
+
+Restart `diggy`, then use **Sync** to upload its saved history. You can also use
+`diggy push` while the app is stopped.
 
 On another machine, clone the database into a new data directory, then start:
 
 ```sh
-./bin/diggy -data /path/to/project/.diggy clone git@github.com:YOUR_ORG/YOUR_PROJECT.git
-./bin/diggy -data /path/to/project/.diggy
+diggy -data /path/to/project/.diggy clone git@github.com:YOUR_ORG/YOUR_PROJECT.git
+diggy -data /path/to/project/.diggy
 ```
 
-To receive or send later edits, stop the app and use:
+Use **Sync** for later edits. To receive or send through the CLI instead, stop the
+app and use:
 
 ```sh
-./bin/diggy pull
-./bin/diggy push
+diggy pull
+diggy push
 ```
 
 Use the same `-data` argument on every command if you use a custom directory.
-There is no automatic push, pull, or synchronization of code and data branches.
+Sync is explicit; it does not synchronize code branches or run in the background.
 Data uses Dolt's `refs/dolt/data` Git transport; ordinary `git clone`, `git pull`,
 and `git push` do not replace these database commands. GitHub/GitLab code PRs do
 not automatically show the database diffs.
 
-**First-pass limitation:** pull accepts fast-forward updates only. If both
-machines have committed independent edits, pull refuses to merge. Local history
+**First-pass limitation:** Sync and pull accept fast-forward updates only. If both
+machines have committed independent edits, they refuse to merge. Local history
 is preserved, but there is no Diggy conflict resolution or branch UI yet. Use a
 single writer at a time for this prototype. An advanced user can stop Diggy and
 inspect the database with a compatible Dolt CLI.
@@ -119,9 +164,9 @@ user, not LAN hosting.
 ## Verification
 
 ```sh
-npm run test:local
-npm run test:unit
-npm run typecheck
+mise run test:local
+mise run test:unit
+mise run typecheck
 ```
 
 The Go suite checks restart persistence, Dolt history, field-sized diffs, stale

@@ -26,6 +26,9 @@ func TestLocalAPIAndOriginBoundary(t *testing.T) {
 		{"PUT", "/api/local/project", "127.0.0.1:4180", "https://evil.example", "{}", 403},
 		{"PUT", "/api/local/project", "127.0.0.1:4180", "", "{}", 428},
 		{"GET", "/api/auth/session", "127.0.0.1:4180", "", "", 404},
+		{"GET", "/api/local/sync", "127.0.0.1:4180", "", "", 405},
+		{"POST", "/api/local/sync", "127.0.0.1:4180", "https://evil.example", "", 403},
+		{"POST", "/api/local/sync", "127.0.0.1:4180", "", "", 428},
 	} {
 		r := httptest.NewRequest(tc.method, "http://"+tc.host+tc.path, strings.NewReader(tc.body))
 		r.Host = tc.host
@@ -43,6 +46,20 @@ func TestLocalAPIAndOriginBoundary(t *testing.T) {
 		t.Fatal("missing initial snapshot / ETag")
 	}
 	initial := w.Header().Get("ETag")
+	request := httptest.NewRequest("POST", "http://127.0.0.1:4180/api/local/sync", nil)
+	request.Header.Set("If-Match", initial)
+	result := httptest.NewRecorder()
+	handler.ServeHTTP(result, request)
+	if result.Code != 409 || !strings.Contains(result.Body.String(), "Set up a Git remote") {
+		t.Fatalf("missing setup guidance: %d %s", result.Code, result.Body)
+	}
+	request = httptest.NewRequest("POST", "http://127.0.0.1:4180/api/local/sync", nil)
+	request.Header.Set("If-Match", `"stale"`)
+	result = httptest.NewRecorder()
+	handler.ServeHTTP(result, request)
+	if result.Code != 412 {
+		t.Fatalf("stale sync accepted: %d", result.Code)
+	}
 	body := `{"project":{"version":1,"layoutVersion":3,"name":"Saved","blocks":[],"crew":[],"dividers":[],"colorLegend":{},"excavations":[]}}`
 	for i, status := range []int{204, 412} {
 		r = httptest.NewRequest("PUT", "http://127.0.0.1:4180/api/local/project", strings.NewReader(body))
