@@ -45,11 +45,10 @@ export function ExcavationCanvas({ view, actions }) {
             className="dependency-lines"
             aria-hidden="true"
           />
-          <button className="surface-sign" type="button" onClick={actions.openProjectDetails} disabled={!view.canEdit}
-            aria-label={view.canEdit ? "Edit surface sign" : "Project surface sign"} title={[projectName(view.state), view.state.subtitle].filter(Boolean).join(" · ")}>
+          <div className="surface-sign" title={[projectName(view.state), view.state.subtitle].filter(Boolean).join(" · ")}>
             <span className="sign-title">{projectName(view.state)}</span>
             {view.state.subtitle && <span className="sign-subtitle">{view.state.subtitle}</span>}
-          </button>
+          </div>
           <div className="depth-label depth-first">SURFACE</div>
           <div className="depth-label depth-next">A LITTLE DEEPER</div>
           <div className="depth-label depth-later">UNCHARTED GROUND</div>

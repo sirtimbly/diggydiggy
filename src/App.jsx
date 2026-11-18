@@ -10,9 +10,13 @@ import { BlockInspector } from "./components/BlockInspector.jsx";
 import { HelpDialog } from "./components/HelpDialog.jsx";
 import { Icon } from "./components/Icon.jsx";
 import { ProjectDetailsDialog } from "./components/ProjectDetailsDialog.jsx";
+import { useEffect } from "react";
+import { projectName } from "./project/project.js";
 
 export default function App({ view, actions }) {
   useProjectShortcuts(actions);
+  const name = projectName(view.state);
+  useEffect(() => { document.title = `${name} · Diggy`; }, [name]);
   return (
     <>
       <Header

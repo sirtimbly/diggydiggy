@@ -42,7 +42,7 @@ export function Header({ project, storageAvailable, sync, presence, canEdit, acc
         </span>
       </a>
       <div className="header-divider"></div>
-      <div className="workspace-name"><ProjectTitle project={project} canEdit={canEdit} actions={actions} /></div>
+      <h1 className="workspace-name"><ProjectTitle project={project} canEdit={canEdit} actions={actions} /></h1>
       <div className="header-end">
         <div className="collaboration-status">
         <span className="local-label" title={sync.status === "local" ? "Use Share to create a shared dig, then open that invite link in your other browser." : undefined}>
@@ -83,7 +83,7 @@ export function Header({ project, storageAvailable, sync, presence, canEdit, acc
         >
           <Icon name="help" />
         </button>
-        {!localDolt && <AccountMenu actions={actions} canEdit={canEdit} />}
+        {!localDolt && <AccountMenu actions={actions} canEdit={canEdit} project={project} />}
       </div>
     </header>
   );

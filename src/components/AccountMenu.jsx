@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Icon } from "./Icon.jsx";
+import { projectName } from "../project/project.js";
+import { createRecentProjects, RECENT_PROJECTS_KEY } from "../project/recent-projects.js";
 
 const errorMessages = {
   cancelled: "Sign-in was cancelled. You can try again whenever you’re ready.",
@@ -10,7 +12,7 @@ const errorMessages = {
   failed: "Couldn’t complete sign-in. Please try again.",
 };
 
-export function AccountMenu({ actions, canEdit }) {
+export function AccountMenu({ actions, canEdit, project }) {
   const menu = useRef(null);
   const requestId = useRef(0);
   const channel = useRef(null);
@@ -18,6 +20,24 @@ export function AccountMenu({ actions, canEdit }) {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [history] = useState(() => {
+    let storage;
+    try { storage = window.localStorage; } catch { /* Browser history is optional. */ }
+    return createRecentProjects(storage);
+  });
+  const [recent, setRecent] = useState(() => history.read());
+  const projectId = new URL(location.href).searchParams.get("project");
+  const name = projectName(project);
+  useEffect(() => {
+    setRecent(history.remember(projectId, name));
+  }, [history, projectId, name]);
+  useEffect(() => {
+    const refresh = (event) => {
+      if (event.key === RECENT_PROJECTS_KEY || event.key === null) setRecent(history.read());
+    };
+    window.addEventListener("storage", refresh);
+    return () => window.removeEventListener("storage", refresh);
+  }, [history]);
 
   async function load(signal) {
     const id = ++requestId.current;
@@ -131,6 +151,15 @@ export function AccountMenu({ actions, canEdit }) {
         )}
         {error && <p className="account-error" role="alert">{error}</p>}
         {!account && !loading && <button className="button" onClick={() => { setError(""); load(); }}>Try again</button>}
+        <nav className="recent-projects" aria-labelledby="recent-projects-heading">
+          <h3 id="recent-projects-heading">Recent projects</h3>
+          <p className="recent-projects-note">Opened in this browser, most recent first.</p>
+          {recent.length ? <ul>{recent.map((entry) => <li key={entry.id}>
+            <a href={history.href(entry.id, location.origin)} aria-current={entry.id === projectId ? "page" : undefined}>
+              <span>{entry.name}</span>{entry.id === projectId && <small>Current</small>}
+            </a>
+          </li>)}</ul> : <p>No projects opened yet. Open a project’s sharing link to find it here.</p>}
+        </nav>
       </div>
     </>
   );

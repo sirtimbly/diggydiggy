@@ -1,13 +1,11 @@
 import { Icon } from "./Icon.jsx";
 import { DIVIDER_COLORS, DIVIDER_LIMIT } from "../project/dividers.js";
 import { ClearedMenu } from "./ClearedMenu.jsx";
-import { ProjectTitle } from "./ProjectTitle.jsx";
 
 export function Toolbar({ view, actions }) {
   return (
     <div className="dig-toolbar">
       <div className="excavation-tools">
-        <h1 className="board-project-title"><ProjectTitle project={view.state} canEdit={view.canEdit} actions={actions} /></h1>
         {!view.isShared && <span className="demo-label">DEMO PROJECT</span>}
         <span className="project-presence">
           <span className="status-dot" />
